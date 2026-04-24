@@ -112,11 +112,6 @@ Comment(id_comment, user_id, prompt_id, content, created_at, updated_at)
 Purchase(id_purchase, buyer_user_id, prompt_id, aipoints_spent, purchased_at)
 ```
 
-## BCNF
-
-Ya se encuentra en BCNF, porque las claves primarias utilizadas son también superclaves.
-
-
 ## Esquema final
 
 ```plaintext
