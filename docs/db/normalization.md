@@ -85,7 +85,7 @@ Prompt(id_prompt, user_id, title, content, description, model, aipoints_price, u
 ```
 
 ```plaintext
-PromptResponse(id_response, prompt_id, content, model, tokens_prompt, tokens_response, generated_at)
+PromptResponse(id_response, prompt_id, content, tokens_prompt, tokens_response, generated_at)
 ```
 
 ```plaintext
@@ -123,7 +123,7 @@ Prompt(id_prompt, user_id, title, content, description, model, aipoints_price, u
 ```
 
 ```plaintext
-PromptResponse(id_response, prompt_id, content, model, tokens_prompt, tokens_response, generated_at)
+PromptResponse(id_response, prompt_id, content, tokens_prompt, tokens_response, generated_at)
 ```
 
 ```plaintext
