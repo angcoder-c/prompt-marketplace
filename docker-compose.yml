@@ -1,31 +1,22 @@
-name: prompt-marketplace
-
 services:
+  libsql:
+    image: ghcr.io/tursodatabase/libsql-server:latest
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./db/data:/var/lib/sqld
+
+  db-init:
+    build: .
+    depends_on:
+      - libsql
+    command: node scripts/init-db.mjs
+
   app:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    build: .
+    depends_on:
+      - db-init
     ports:
       - "3000:3000"
     environment:
-      - DATABASE_URL=http://libsql:8080
-    depends_on:
-      libsql:
-        condition: service_started
-    volumes:
-      - ./db:/db:ro
-    restart: unless-stopped
-
-  libsql:
-    image: ghcr.io/turso technology/libsql-server:latest
-    ports:
-      - "8080:8080"
-    environment:
-      - DATABASE_PATH=/data/promptmk.db
-      - DATABASE_URL=file:/data/promptmk.db
-    volumes:
-      - db_data:/data
-    command: ["--enable-http", "--enable-http-cors"]
-
-volumes:
-  db_data:
+      DATABASE_URL: http://libsql:8080

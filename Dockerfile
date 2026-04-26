@@ -1,6 +1,4 @@
-FROM node:20-alpine
-
-RUN apk add --no-cache sqlite-tools
+FROM node:22-alpine
 
 WORKDIR /app
 
@@ -9,8 +7,6 @@ RUN npm ci
 
 COPY . .
 
-RUN mkdir -p /app/data
+EXPOSE 3000
 
-COPY db/*.sql /db/
-
-CMD ["sh", "/db/init.sh", "&&", "npm", "start"]
+CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
