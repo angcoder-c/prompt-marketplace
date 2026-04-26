@@ -10,8 +10,6 @@
 
 Proyecto pensado para practicar SQL real sobre un caso de negocio tipo marketplace de prompts.
 
-## Que vas a practicar aqui
-
 | Tema | Practica |
 |---|---|
 | DDL | Tablas, PK/FK, checks, indices, vistas |
@@ -64,7 +62,7 @@ TURSO_DATABASE_URL=
 TURSO_AUTH_TOKEN=
 ```
 
-## Diseno
+## Diseño
 
 Recursos de diseno y documentacion del proyecto:
 
