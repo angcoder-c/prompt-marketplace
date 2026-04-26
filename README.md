@@ -55,7 +55,7 @@ Tip: usa `[User]` o `"User"` para evitar conflicto por el nombre de tabla.
 |---|---|
 | Host local | `http://localhost:8080` |
 | Otro contenedor en la red de compose | `http://libsql:8080` |
-| Turso cloud | `libsql://tu-db.turso.io` |
+| Turso cloud | `libsql://<db-name>.turso.io` |
 
 ```env
 TURSO_DATABASE_URL=
