@@ -64,7 +64,7 @@ TURSO_AUTH_TOKEN=
 
 ## Diseño
 
-Recursos de diseno y documentacion del proyecto:
+Recursos de diseno y documentación del proyecto:
 
 | Tipo | Recurso |
 |---|---|
