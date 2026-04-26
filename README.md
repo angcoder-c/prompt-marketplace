@@ -10,8 +10,6 @@
 
 Proyecto pensado para practicar SQL real sobre un caso de negocio tipo marketplace de prompts.
 
-## Que vas a practicar aqui
-
 | Tema | Practica |
 |---|---|
 | DDL | Tablas, PK/FK, checks, indices, vistas |
@@ -57,16 +55,16 @@ Tip: usa `[User]` o `"User"` para evitar conflicto por el nombre de tabla.
 |---|---|
 | Host local | `http://localhost:8080` |
 | Otro contenedor en la red de compose | `http://libsql:8080` |
-| Turso cloud | `libsql://tu-db.turso.io` |
+| Turso cloud | `libsql://<db-name>.turso.io` |
 
 ```env
 TURSO_DATABASE_URL=
 TURSO_AUTH_TOKEN=
 ```
 
-## Diseno
+## Diseño
 
-Recursos de diseno y documentacion del proyecto:
+Recursos de diseno y documentación del proyecto:
 
 | Tipo | Recurso |
 |---|---|
