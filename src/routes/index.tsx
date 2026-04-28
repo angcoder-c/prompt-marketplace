@@ -292,6 +292,57 @@ function Home() {
     }
   }
 
+  const handleFetchRanking = async () => {
+    setPromptLoading(true)
+    setPromptMessage(null)
+
+    try {
+      const response = await fetch('/api/ranking?page=1&limit=5')
+      const data = await response.json().catch(() => ({}))
+      setApiPreview(JSON.stringify(data, null, 2))
+
+      if (!response.ok) {
+        showPromptMessage('error', data?.error?.message || `Error ${response.status}`)
+        return
+      }
+
+      showPromptMessage('ok', 'Ranking cargado')
+    } catch (error) {
+      showPromptMessage('error', error instanceof Error ? error.message : 'Error inesperado')
+    } finally {
+      setPromptLoading(false)
+    }
+  }
+
+  const handlePurchasePrompt = async () => {
+    if (!promptId.trim()) {
+      showPromptMessage('error', 'Escribe un prompt id primero')
+      return
+    }
+
+    setPromptLoading(true)
+    setPromptMessage(null)
+
+    try {
+      const response = await fetch(`/api/prompts/${promptId.trim()}/purchase`, {
+        method: 'POST',
+      })
+      const data = await response.json().catch(() => ({}))
+      setApiPreview(JSON.stringify(data, null, 2))
+
+      if (!response.ok) {
+        showPromptMessage('error', data?.error?.message || `Error ${response.status}`)
+        return
+      }
+
+      showPromptMessage('ok', 'Prompt comprado correctamente')
+    } catch (error) {
+      showPromptMessage('error', error instanceof Error ? error.message : 'Error inesperado')
+    } finally {
+      setPromptLoading(false)
+    }
+  }
+
   const handleListTags = async () => {
     setPromptLoading(true)
     setPromptMessage(null)
@@ -919,6 +970,34 @@ function Home() {
             >
               Listar prompts
             </button>
+          </div>
+
+          <div className="mt-4 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4">
+            <h3 className="text-sm font-semibold uppercase tracking-[0.16em] text-slate-500">
+              Ejemplo de compra y ranking
+            </h3>
+            <p className="mt-2 text-sm text-slate-600">
+              Usa el mismo Prompt ID de arriba para comprar un prompt de ejemplo, o consulta el ranking global sin autenticación.
+            </p>
+
+            <div className="mt-4 grid gap-2 md:grid-cols-2">
+              <button
+                type="button"
+                onClick={handlePurchasePrompt}
+                disabled={promptLoading || !currentUser}
+                className="rounded-xl bg-amber-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-amber-500 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Comprar prompt de ejemplo
+              </button>
+              <button
+                type="button"
+                onClick={handleFetchRanking}
+                disabled={promptLoading}
+                className="rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-900 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Ver ranking global
+              </button>
+            </div>
           </div>
 
           {promptMessage && (
