@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiSearchRouteImport } from './routes/api/search'
+import { Route as ApiRankingRouteImport } from './routes/api/ranking'
 import { Route as ApiTagsIndexRouteImport } from './routes/api/tags/index'
 import { Route as ApiPromptsIndexRouteImport } from './routes/api/prompts/index'
 import { Route as ApiUsersSetupRouteImport } from './routes/api/users/setup'
@@ -20,6 +21,7 @@ import { Route as ApiPromptsIdRouteImport } from './routes/api/prompts/$id'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as ApiTagsSlugFollowRouteImport } from './routes/api/tags/$slug/follow'
 import { Route as ApiPromptsIdVoteRouteImport } from './routes/api/prompts/$id/vote'
+import { Route as ApiPromptsIdPurchaseRouteImport } from './routes/api/prompts/$id/purchase'
 import { Route as ApiPromptsIdGenerateResponseRouteImport } from './routes/api/prompts/$id/generate-response'
 import { Route as ApiPromptsIdCommentsIndexRouteImport } from './routes/api/prompts/$id/comments/index'
 import { Route as ApiPromptsIdCommentsComment_idRouteImport } from './routes/api/prompts/$id/comments/$comment_id'
@@ -32,6 +34,11 @@ const IndexRoute = IndexRouteImport.update({
 const ApiSearchRoute = ApiSearchRouteImport.update({
   id: '/api/search',
   path: '/api/search',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiRankingRoute = ApiRankingRouteImport.update({
+  id: '/api/ranking',
+  path: '/api/ranking',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiTagsIndexRoute = ApiTagsIndexRouteImport.update({
@@ -79,6 +86,11 @@ const ApiPromptsIdVoteRoute = ApiPromptsIdVoteRouteImport.update({
   path: '/vote',
   getParentRoute: () => ApiPromptsIdRoute,
 } as any)
+const ApiPromptsIdPurchaseRoute = ApiPromptsIdPurchaseRouteImport.update({
+  id: '/purchase',
+  path: '/purchase',
+  getParentRoute: () => ApiPromptsIdRoute,
+} as any)
 const ApiPromptsIdGenerateResponseRoute =
   ApiPromptsIdGenerateResponseRouteImport.update({
     id: '/generate-response',
@@ -100,6 +112,7 @@ const ApiPromptsIdCommentsComment_idRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/api/ranking': typeof ApiRankingRoute
   '/api/search': typeof ApiSearchRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/prompts/$id': typeof ApiPromptsIdRouteWithChildren
@@ -109,6 +122,7 @@ export interface FileRoutesByFullPath {
   '/api/prompts/': typeof ApiPromptsIndexRoute
   '/api/tags/': typeof ApiTagsIndexRoute
   '/api/prompts/$id/generate-response': typeof ApiPromptsIdGenerateResponseRoute
+  '/api/prompts/$id/purchase': typeof ApiPromptsIdPurchaseRoute
   '/api/prompts/$id/vote': typeof ApiPromptsIdVoteRoute
   '/api/tags/$slug/follow': typeof ApiTagsSlugFollowRoute
   '/api/prompts/$id/comments/$comment_id': typeof ApiPromptsIdCommentsComment_idRoute
@@ -116,6 +130,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/api/ranking': typeof ApiRankingRoute
   '/api/search': typeof ApiSearchRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/prompts/$id': typeof ApiPromptsIdRouteWithChildren
@@ -125,6 +140,7 @@ export interface FileRoutesByTo {
   '/api/prompts': typeof ApiPromptsIndexRoute
   '/api/tags': typeof ApiTagsIndexRoute
   '/api/prompts/$id/generate-response': typeof ApiPromptsIdGenerateResponseRoute
+  '/api/prompts/$id/purchase': typeof ApiPromptsIdPurchaseRoute
   '/api/prompts/$id/vote': typeof ApiPromptsIdVoteRoute
   '/api/tags/$slug/follow': typeof ApiTagsSlugFollowRoute
   '/api/prompts/$id/comments/$comment_id': typeof ApiPromptsIdCommentsComment_idRoute
@@ -133,6 +149,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/api/ranking': typeof ApiRankingRoute
   '/api/search': typeof ApiSearchRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/prompts/$id': typeof ApiPromptsIdRouteWithChildren
@@ -142,6 +159,7 @@ export interface FileRoutesById {
   '/api/prompts/': typeof ApiPromptsIndexRoute
   '/api/tags/': typeof ApiTagsIndexRoute
   '/api/prompts/$id/generate-response': typeof ApiPromptsIdGenerateResponseRoute
+  '/api/prompts/$id/purchase': typeof ApiPromptsIdPurchaseRoute
   '/api/prompts/$id/vote': typeof ApiPromptsIdVoteRoute
   '/api/tags/$slug/follow': typeof ApiTagsSlugFollowRoute
   '/api/prompts/$id/comments/$comment_id': typeof ApiPromptsIdCommentsComment_idRoute
@@ -151,6 +169,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/api/ranking'
     | '/api/search'
     | '/api/auth/$'
     | '/api/prompts/$id'
@@ -160,6 +179,7 @@ export interface FileRouteTypes {
     | '/api/prompts/'
     | '/api/tags/'
     | '/api/prompts/$id/generate-response'
+    | '/api/prompts/$id/purchase'
     | '/api/prompts/$id/vote'
     | '/api/tags/$slug/follow'
     | '/api/prompts/$id/comments/$comment_id'
@@ -167,6 +187,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/api/ranking'
     | '/api/search'
     | '/api/auth/$'
     | '/api/prompts/$id'
@@ -176,6 +197,7 @@ export interface FileRouteTypes {
     | '/api/prompts'
     | '/api/tags'
     | '/api/prompts/$id/generate-response'
+    | '/api/prompts/$id/purchase'
     | '/api/prompts/$id/vote'
     | '/api/tags/$slug/follow'
     | '/api/prompts/$id/comments/$comment_id'
@@ -183,6 +205,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/api/ranking'
     | '/api/search'
     | '/api/auth/$'
     | '/api/prompts/$id'
@@ -192,6 +215,7 @@ export interface FileRouteTypes {
     | '/api/prompts/'
     | '/api/tags/'
     | '/api/prompts/$id/generate-response'
+    | '/api/prompts/$id/purchase'
     | '/api/prompts/$id/vote'
     | '/api/tags/$slug/follow'
     | '/api/prompts/$id/comments/$comment_id'
@@ -200,6 +224,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ApiRankingRoute: typeof ApiRankingRoute
   ApiSearchRoute: typeof ApiSearchRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
   ApiPromptsIdRoute: typeof ApiPromptsIdRouteWithChildren
@@ -224,6 +249,13 @@ declare module '@tanstack/react-router' {
       path: '/api/search'
       fullPath: '/api/search'
       preLoaderRoute: typeof ApiSearchRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/ranking': {
+      id: '/api/ranking'
+      path: '/api/ranking'
+      fullPath: '/api/ranking'
+      preLoaderRoute: typeof ApiRankingRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/tags/': {
@@ -289,6 +321,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPromptsIdVoteRouteImport
       parentRoute: typeof ApiPromptsIdRoute
     }
+    '/api/prompts/$id/purchase': {
+      id: '/api/prompts/$id/purchase'
+      path: '/purchase'
+      fullPath: '/api/prompts/$id/purchase'
+      preLoaderRoute: typeof ApiPromptsIdPurchaseRouteImport
+      parentRoute: typeof ApiPromptsIdRoute
+    }
     '/api/prompts/$id/generate-response': {
       id: '/api/prompts/$id/generate-response'
       path: '/generate-response'
@@ -315,6 +354,7 @@ declare module '@tanstack/react-router' {
 
 interface ApiPromptsIdRouteChildren {
   ApiPromptsIdGenerateResponseRoute: typeof ApiPromptsIdGenerateResponseRoute
+  ApiPromptsIdPurchaseRoute: typeof ApiPromptsIdPurchaseRoute
   ApiPromptsIdVoteRoute: typeof ApiPromptsIdVoteRoute
   ApiPromptsIdCommentsComment_idRoute: typeof ApiPromptsIdCommentsComment_idRoute
   ApiPromptsIdCommentsIndexRoute: typeof ApiPromptsIdCommentsIndexRoute
@@ -322,6 +362,7 @@ interface ApiPromptsIdRouteChildren {
 
 const ApiPromptsIdRouteChildren: ApiPromptsIdRouteChildren = {
   ApiPromptsIdGenerateResponseRoute: ApiPromptsIdGenerateResponseRoute,
+  ApiPromptsIdPurchaseRoute: ApiPromptsIdPurchaseRoute,
   ApiPromptsIdVoteRoute: ApiPromptsIdVoteRoute,
   ApiPromptsIdCommentsComment_idRoute: ApiPromptsIdCommentsComment_idRoute,
   ApiPromptsIdCommentsIndexRoute: ApiPromptsIdCommentsIndexRoute,
@@ -345,6 +386,7 @@ const ApiTagsSlugRouteWithChildren = ApiTagsSlugRoute._addFileChildren(
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ApiRankingRoute: ApiRankingRoute,
   ApiSearchRoute: ApiSearchRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
   ApiPromptsIdRoute: ApiPromptsIdRouteWithChildren,

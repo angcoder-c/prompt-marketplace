@@ -478,6 +478,131 @@ export async function findPromptOwner(promptId: string) {
 	};
 }
 
+export async function purchasePrompt(input: {
+	buyerUserId: string;
+	promptId: string;
+}) {
+	const transaction = await db.transaction();
+
+	try {
+		const promptResult = await transaction.execute({
+			sql: `
+				SELECT
+					p.id_prompt,
+					p.user_id,
+					p.content,
+					p.aipoints_price,
+					p.is_published,
+					buyer.aipoints
+				FROM Prompt p
+				JOIN User buyer ON buyer.id_user = ?
+				WHERE p.id_prompt = ?
+				LIMIT 1
+			`,
+			args: [input.buyerUserId, input.promptId],
+		});
+
+		const promptRow = promptResult.rows[0] as Record<string, unknown> | undefined;
+		if (!promptRow) {
+			await transaction.rollback();
+			return { status: 'not_found' as const };
+		}
+
+		if (String(promptRow.user_id) === input.buyerUserId) {
+			await transaction.rollback();
+			return { status: 'forbidden' as const };
+		}
+
+		if (Number(promptRow.is_published ?? 0) !== 1) {
+			await transaction.rollback();
+			return { status: 'not_found' as const };
+		}
+
+		const existingPurchaseResult = await transaction.execute({
+			sql: `
+				SELECT id_purchase
+				FROM Purchase
+				WHERE buyer_user_id = ? AND prompt_id = ?
+				LIMIT 1
+			`,
+			args: [input.buyerUserId, input.promptId],
+		});
+
+		if (existingPurchaseResult.rows[0]) {
+			await transaction.rollback();
+			return { status: 'already_purchased' as const };
+		}
+
+		const availableAipoints = Number(promptRow.aipoints ?? 0);
+		const aipointsSpent = Math.max(0, Number(promptRow.aipoints_price ?? 0));
+
+		if (availableAipoints < aipointsSpent) {
+			await transaction.rollback();
+			return {
+				status: 'insufficient_aipoints' as const,
+				required: aipointsSpent,
+				available: availableAipoints,
+			};
+		}
+
+		const purchaseId = randomUUID();
+
+		await transaction.execute({
+			sql: `
+				UPDATE User
+				SET aipoints = aipoints - ?, updated_at = datetime('now')
+				WHERE id_user = ?
+			`,
+			args: [aipointsSpent, input.buyerUserId],
+		});
+
+		await transaction.execute({
+			sql: `
+				INSERT INTO Purchase (
+					id_purchase,
+					buyer_user_id,
+					prompt_id,
+					aipoints_spent
+				) VALUES (?, ?, ?, ?)
+			`,
+			args: [purchaseId, input.buyerUserId, input.promptId, aipointsSpent],
+		});
+
+		const purchaseResult = await transaction.execute({
+			sql: `
+				SELECT id_purchase, prompt_id, aipoints_spent, purchased_at
+				FROM Purchase
+				WHERE id_purchase = ?
+				LIMIT 1
+			`,
+			args: [purchaseId],
+		});
+
+		const purchaseRow = purchaseResult.rows[0] as Record<string, unknown> | undefined;
+		if (!purchaseRow) {
+			await transaction.rollback();
+			return { status: 'not_found' as const };
+		}
+
+		await transaction.commit();
+
+		return {
+			status: 'ok' as const,
+			purchase: {
+				id_purchase: String(purchaseRow.id_purchase),
+				prompt_id: String(purchaseRow.prompt_id),
+				aipoints_spent: Number(purchaseRow.aipoints_spent ?? 0),
+				remaining_aipoints: availableAipoints - aipointsSpent,
+				prompt_content: String(promptRow.content ?? ''),
+				purchased_at: String(purchaseRow.purchased_at),
+			},
+		};
+	} catch (error) {
+		await transaction.rollback().catch(() => undefined)
+		throw error
+	}
+}
+
 export async function findPromptById(promptId: string) {
 	const result = await db.execute({
 		sql: `
@@ -668,6 +793,136 @@ export async function listPublishedPrompts(input: {
 
 	return {
 		data,
+		pagination: {
+			page: safePage,
+			limit: safeLimit,
+			total,
+		},
+	};
+}
+
+export async function listRanking(input: {
+	page: number;
+	limit: number;
+}) {
+	const safePage = Math.max(1, input.page);
+	const safeLimit = Math.min(50, Math.max(1, input.limit));
+	const offset = (safePage - 1) * safeLimit;
+	const twentyFourHoursAgo = "datetime('now', '-24 hours')";
+
+	const totalResult = await db.execute({
+		sql: `
+			SELECT COUNT(*) AS total
+			FROM User
+		`,
+	});
+
+	const statsResult = await db.execute({
+		sql: `
+			SELECT
+				(
+					SELECT COUNT(DISTINCT user_id)
+					FROM (
+						SELECT user_id
+						FROM Prompt
+						WHERE created_at >= ${twentyFourHoursAgo}
+						UNION
+						SELECT user_id
+						FROM Comment
+						WHERE created_at >= ${twentyFourHoursAgo}
+						UNION
+						SELECT user_id
+						FROM Vote
+						WHERE created_at >= ${twentyFourHoursAgo}
+						UNION
+						SELECT buyer_user_id AS user_id
+						FROM Purchase
+						WHERE purchased_at >= ${twentyFourHoursAgo}
+					)
+				) AS active_users,
+				(
+					SELECT COUNT(*)
+					FROM Prompt
+					WHERE created_at >= ${twentyFourHoursAgo}
+				) AS posts_last_24h,
+				(
+					SELECT model
+					FROM Prompt
+					WHERE is_published = 1 AND created_at >= ${twentyFourHoursAgo}
+					GROUP BY model
+					ORDER BY COUNT(*) DESC, MAX(created_at) DESC
+					LIMIT 1
+				) AS trending_model_recent,
+				(
+					SELECT model
+					FROM Prompt
+					WHERE is_published = 1
+					GROUP BY model
+					ORDER BY COUNT(*) DESC, MAX(created_at) DESC
+					LIMIT 1
+				) AS trending_model_fallback
+		`,
+	});
+
+	const rowsResult = await db.execute({
+		sql: `
+			SELECT
+				u.id_user,
+				u.username,
+				u.avatar_url,
+				u.airank,
+				(
+					SELECT COUNT(*)
+					FROM Prompt p
+					WHERE p.user_id = u.id_user AND p.is_published = 1
+				) AS prompts_published,
+				(
+					SELECT COUNT(*)
+					FROM Prompt p
+					JOIN Vote v ON v.prompt_id = p.id_prompt
+					WHERE p.user_id = u.id_user AND v.vote_type = 1
+				) AS total_upvotes,
+				(
+					SELECT COUNT(*)
+					FROM Prompt p
+					JOIN Vote v ON v.prompt_id = p.id_prompt
+					WHERE p.user_id = u.id_user AND v.vote_type = -1
+				) AS total_downvotes
+			FROM User u
+			ORDER BY u.airank DESC, u.created_at ASC
+			LIMIT ? OFFSET ?
+		`,
+		args: [safeLimit, offset],
+	});
+
+	const totalRow = totalResult.rows[0] as Record<string, unknown> | undefined;
+	const statsRow = statsResult.rows[0] as Record<string, unknown> | undefined;
+	const total = Number(totalRow?.total ?? 0);
+	const trendingModel =
+		statsRow?.trending_model_recent !== null && statsRow?.trending_model_recent !== undefined
+			? String(statsRow.trending_model_recent)
+			: statsRow?.trending_model_fallback !== null && statsRow?.trending_model_fallback !== undefined
+				? String(statsRow.trending_model_fallback)
+				: null;
+
+	return {
+		stats: {
+			active_users: Number(statsRow?.active_users ?? 0),
+			posts_last_24h: Number(statsRow?.posts_last_24h ?? 0),
+			trending_model: trendingModel,
+		},
+		data: rowsResult.rows.map((row, index) => ({
+			rank: offset + index + 1,
+			user: {
+				id_user: String(row.id_user),
+				username: String(row.username),
+				avatar_url: row.avatar_url ? String(row.avatar_url) : null,
+			},
+			airank: Number(row.airank ?? 0),
+			total_upvotes: Number(row.total_upvotes ?? 0),
+			total_downvotes: Number(row.total_downvotes ?? 0),
+			prompts_published: Number(row.prompts_published ?? 0),
+		})),
 		pagination: {
 			page: safePage,
 			limit: safeLimit,
