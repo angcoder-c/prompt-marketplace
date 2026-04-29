@@ -77,20 +77,3 @@ Recursos de diseno y documentación del proyecto:
 ## Licencia
 
 MIT.
-
-
----
-
-## Nota sobre autenticación con Better Auth
-
-En tus endpoints de TanStack Start, para proteger una ruta se hace así:
-
-```ts
-// En el server function o API route
-const session = await auth.api.getSession({ headers: request.headers })
-if (!session) throw new Error("Unauthorized")
-
-const userId = session.user.id // este es el id de Better Auth, lo usas como FK en tu tabla User
-```
-
-Los endpoints de Better Auth (`/api/auth/*`) los registras una sola vez con el handler que provee la librería y no los tocas más. Todo lo demás en `/api/v1/*` es tuyo.
