@@ -1,1233 +1,218 @@
-import { useMemo, useState } from 'react'
-import { createFileRoute } from '@tanstack/react-router'
+import { useEffect, useMemo, useState } from 'react'
+import { createFileRoute, Link } from '@tanstack/react-router'
+import { ChevronLeft, ChevronRight, Sparkles } from 'lucide-react'
 
 import { authClient } from '#/lib/auth-client'
+import { SearchBar } from '#/components/searchbar'
+import { PromptDetailModal } from '#/components/prompt-detail-modal'
+import { PromptFeedCard } from '#/components/promptfeedcard'
+import { Sidebar } from '#/components/sidebar'
+
+type Prompt = {
+  id_prompt: string
+  user_id: string
+  title: string
+  description: string | null
+  content: string
+  model: string
+  aipoints_price: number
+  username: string
+  avatar_url: string | null
+  created_at: string
+  updated_at: string
+  upvotes: number
+  downvotes: number
+  tags: string[]
+}
+
+type PromptResponse = {
+  data: Prompt[]
+  pagination: {
+    page: number
+    limit: number
+    total: number
+  }
+}
+
+const pageSize = 8
 
 export const Route = createFileRoute('/')({ component: Home })
 
 function Home() {
-  const [mode, setMode] = useState<'signin' | 'signup'>('signin')
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [name, setName] = useState('')
-  const [username, setUsername] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [message, setMessage] = useState<string | null>(null)
-  const [messageType, setMessageType] = useState<'ok' | 'error' | 'info'>('info')
-  const [promptLoading, setPromptLoading] = useState(false)
-  const [promptMessage, setPromptMessage] = useState<string | null>(null)
-  const [promptMessageType, setPromptMessageType] = useState<'ok' | 'error' | 'info'>('info')
-
-  const [tagsQuery, setTagsQuery] = useState('')
-  const [tagFollowLoading, setTagFollowLoading] = useState(false)
-
-  const [searchQuery, setSearchQuery] = useState('')
-  const [searchType, setSearchType] = useState<'all' | 'tag'>('all')
-
-  const [votePromptId, setVotePromptId] = useState('')
-  const [voteType, setVoteType] = useState<'up' | 'down'>('up')
-
-  const [commentPromptId, setCommentPromptId] = useState('')
-  const [commentContent, setCommentContent] = useState('')
-  const [commentId, setCommentId] = useState('')
-
-  const [promptId, setPromptId] = useState('')
-  const [promptTitle, setPromptTitle] = useState('')
-  const [promptContent, setPromptContent] = useState('')
-  const [promptDescription, setPromptDescription] = useState('')
-  const [promptTags, setPromptTags] = useState('')
-  const [promptModel, setPromptModel] = useState('meta-llama/llama-3.3-70b-instruct:free')
-  const [promptPrice, setPromptPrice] = useState('0')
-  const [promptIsPublished, setPromptIsPublished] = useState(true)
-  const [manualGeneratedResponse, setManualGeneratedResponse] = useState('')
-  const [apiPreview, setApiPreview] = useState('')
-
   const session = authClient.useSession()
-  const currentUser = useMemo(() => session.data?.user ?? null, [session.data?.user])
+  const user = session.data?.user ?? null
 
-  const showMessage = (type: 'ok' | 'error' | 'info', text: string) => {
-    setMessageType(type)
-    setMessage(text)
-  }
+  const [page, setPage] = useState(1)
+  const [response, setResponse] = useState<PromptResponse | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [selectedPrompt, setSelectedPrompt] = useState<Prompt | null>(null)
 
-  const showPromptMessage = (type: 'ok' | 'error' | 'info', text: string) => {
-    setPromptMessageType(type)
-    setPromptMessage(text)
-  }
+  useEffect(() => {
+    let cancelled = false
 
-  const handleEmailAuth = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault()
-    setLoading(true)
-    setMessage(null)
+    const loadPrompts = async () => {
+      setLoading(true)
+      setError(null)
 
-    try {
-      if (mode === 'signin') {
-        const res = await authClient.signIn.email({ email, password })
-        if (res.error) {
-          showMessage('error', res.error.message || 'No se pudo iniciar sesión')
-        } else {
-          showMessage('ok', 'Sesión iniciada correctamente')
-        }
-      } else {
-        const res = await authClient.signUp.email({
-          email,
-          password,
-          name: name.trim() || email,
-        })
+      try {
+        const url = new URL('/api/prompts', window.location.origin)
+        url.searchParams.set('page', String(page))
+        url.searchParams.set('limit', String(pageSize))
+        url.searchParams.set('sort', 'recent')
 
-        if (res.error) {
-          showMessage('error', res.error.message || 'No se pudo crear la cuenta')
-        } else {
-          showMessage('ok', 'Cuenta creada. Ahora puedes hacer setup de perfil.')
-        }
-      }
-    } catch (error) {
-      showMessage('error', error instanceof Error ? error.message : 'Error inesperado')
-    } finally {
-      setLoading(false)
-    }
-  }
+        const res = await fetch(url)
+        const data = (await res.json().catch(() => null)) as PromptResponse | { error?: { message?: string } } | null
 
-  const handleSocial = async (provider: 'google' | 'github') => {
-    setLoading(true)
-    setMessage(null)
-
-    try {
-      const res = await authClient.signIn.social({ provider })
-      if (res.error) {
-        showMessage('error', res.error.message || `No se pudo iniciar con ${provider}`)
-      }
-    } catch (error) {
-      showMessage('error', error instanceof Error ? error.message : 'Error inesperado')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleSignOut = async () => {
-    setLoading(true)
-    setMessage(null)
-
-    try {
-      const res = await authClient.signOut()
-      if (res.error) {
-        showMessage('error', res.error.message || 'No se pudo cerrar sesión')
-      } else {
-        showMessage('ok', 'Sesión cerrada')
-      }
-    } catch (error) {
-      showMessage('error', error instanceof Error ? error.message : 'Error inesperado')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleSetupProfile = async () => {
-    if (!username.trim()) {
-      showMessage('error', 'Debes escribir un username para setup')
-      return
-    }
-
-    setLoading(true)
-    setMessage(null)
-
-    try {
-      const response = await fetch('/api/users/setup', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: username.trim() }),
-      })
-
-      const data = await response.json().catch(() => ({}))
-
-      if (!response.ok) {
-        const errorMessage =
-          data?.error?.message || `Setup falló con status ${response.status}`
-        showMessage('error', errorMessage)
-        return
-      }
-
-      showMessage('ok', `Perfil creado para ${data.username}`)
-    } catch (error) {
-      showMessage('error', error instanceof Error ? error.message : 'Error inesperado')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const parseTags = (raw: string) =>
-    raw
-      .split(',')
-      .map((value) => value.trim())
-      .filter(Boolean)
-
-  const handleCreatePrompt = async () => {
-    setPromptLoading(true)
-    setPromptMessage(null)
-
-    try {
-      const response = await fetch('/api/prompts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: promptTitle,
-          content: promptContent,
-          description: promptDescription || null,
-          model: promptModel,
-          aipoints_price: Number(promptPrice || 0),
-          is_published: promptIsPublished,
-          tags: parseTags(promptTags),
-        }),
-      })
-
-      const data = await response.json().catch(() => ({}))
-      setApiPreview(JSON.stringify(data, null, 2))
-
-      if (!response.ok) {
-        showPromptMessage('error', data?.error?.message || `Error ${response.status}`)
-        return
-      }
-
-      setPromptId(data.id_prompt || '')
-      showPromptMessage('ok', `Prompt creado: ${data.id_prompt}`)
-    } catch (error) {
-      showPromptMessage('error', error instanceof Error ? error.message : 'Error inesperado')
-    } finally {
-      setPromptLoading(false)
-    }
-  }
-
-  const handleFetchPrompt = async () => {
-    if (!promptId.trim()) {
-      showPromptMessage('error', 'Escribe un prompt id primero')
-      return
-    }
-
-    setPromptLoading(true)
-    setPromptMessage(null)
-
-    try {
-      const response = await fetch(`/api/prompts/${promptId.trim()}`)
-      const data = await response.json().catch(() => ({}))
-      setApiPreview(JSON.stringify(data, null, 2))
-
-      if (!response.ok) {
-        showPromptMessage('error', data?.error?.message || `Error ${response.status}`)
-        return
-      }
-
-      showPromptMessage('ok', 'Detalle de prompt obtenido')
-    } catch (error) {
-      showPromptMessage('error', error instanceof Error ? error.message : 'Error inesperado')
-    } finally {
-      setPromptLoading(false)
-    }
-  }
-
-  const handleGeneratePromptResponse = async () => {
-    if (!promptId.trim()) {
-      showPromptMessage('error', 'Escribe un prompt id primero')
-      return
-    }
-
-    setPromptLoading(true)
-    setPromptMessage(null)
-
-    try {
-      const response = await fetch(`/api/prompts/${promptId.trim()}/generate-response`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: promptModel,
-          manual_response: manualGeneratedResponse.trim() || undefined,
-        }),
-      })
-
-      const data = await response.json().catch(() => ({}))
-      setApiPreview(JSON.stringify(data, null, 2))
-
-      if (!response.ok) {
-        if (data?.error?.code === 'OPENROUTER_UNAVAILABLE') {
-          showPromptMessage(
-            'info',
-            'OpenRouter no disponible. Pega una respuesta manual en el campo y vuelve a enviar.',
-          )
-          return
+        if (!res.ok) {
+          throw new Error((data as { error?: { message?: string } } | null)?.error?.message || 'No se pudo cargar prompts')
         }
 
-        showPromptMessage('error', data?.error?.message || `Error ${response.status}`)
-        return
+        if (!cancelled) {
+          setResponse(data as PromptResponse)
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : 'Error inesperado')
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false)
+        }
       }
-
-      showPromptMessage('ok', `Prompt response guardada: ${data.id_response}`)
-      if (data.content) {
-        setManualGeneratedResponse(String(data.content))
-      }
-    } catch (error) {
-      showPromptMessage('error', error instanceof Error ? error.message : 'Error inesperado')
-    } finally {
-      setPromptLoading(false)
-    }
-  }
-
-  const handleListPrompts = async () => {
-    setPromptLoading(true)
-    setPromptMessage(null)
-
-    try {
-      const response = await fetch('/api/prompts?page=1&limit=5&sort=recent')
-      const data = await response.json().catch(() => ({}))
-      setApiPreview(JSON.stringify(data, null, 2))
-
-      if (!response.ok) {
-        showPromptMessage('error', data?.error?.message || `Error ${response.status}`)
-        return
-      }
-
-      showPromptMessage('ok', 'Listado de prompts cargado')
-    } catch (error) {
-      showPromptMessage('error', error instanceof Error ? error.message : 'Error inesperado')
-    } finally {
-      setPromptLoading(false)
-    }
-  }
-
-  const handleFetchRanking = async () => {
-    setPromptLoading(true)
-    setPromptMessage(null)
-
-    try {
-      const response = await fetch('/api/ranking?page=1&limit=5')
-      const data = await response.json().catch(() => ({}))
-      setApiPreview(JSON.stringify(data, null, 2))
-
-      if (!response.ok) {
-        showPromptMessage('error', data?.error?.message || `Error ${response.status}`)
-        return
-      }
-
-      showPromptMessage('ok', 'Ranking cargado')
-    } catch (error) {
-      showPromptMessage('error', error instanceof Error ? error.message : 'Error inesperado')
-    } finally {
-      setPromptLoading(false)
-    }
-  }
-
-  const handlePurchasePrompt = async () => {
-    if (!promptId.trim()) {
-      showPromptMessage('error', 'Escribe un prompt id primero')
-      return
     }
 
-    setPromptLoading(true)
-    setPromptMessage(null)
+    void loadPrompts()
 
-    try {
-      const response = await fetch(`/api/prompts/${promptId.trim()}/purchase`, {
-        method: 'POST',
-      })
-      const data = await response.json().catch(() => ({}))
-      setApiPreview(JSON.stringify(data, null, 2))
-
-      if (!response.ok) {
-        showPromptMessage('error', data?.error?.message || `Error ${response.status}`)
-        return
-      }
-
-      showPromptMessage('ok', 'Prompt comprado correctamente')
-    } catch (error) {
-      showPromptMessage('error', error instanceof Error ? error.message : 'Error inesperado')
-    } finally {
-      setPromptLoading(false)
+    return () => {
+      cancelled = true
     }
-  }
+  }, [page])
 
-  const handleListTags = async () => {
-    setPromptLoading(true)
-    setPromptMessage(null)
+  const totalPages = useMemo(() => {
+    const total = response?.pagination.total ?? 0
+    return Math.max(1, Math.ceil(total / pageSize))
+  }, [response?.pagination.total])
 
-    try {
-      const response = await fetch('/api/tags')
-      const data = await response.json().catch(() => ({}))
-      setApiPreview(JSON.stringify(data, null, 2))
-
-      if (!response.ok) {
-        showPromptMessage('error', data?.error?.message || `Error ${response.status}`)
-        return
-      }
-
-      showPromptMessage('ok', 'Listado de tags cargado')
-    } catch (error) {
-      showPromptMessage('error', error instanceof Error ? error.message : 'Error inesperado')
-    } finally {
-      setPromptLoading(false)
-    }
-  }
-
-  const handleFetchTag = async () => {
-    if (!tagsQuery.trim()) {
-      showPromptMessage('error', 'Escribe un tag slug primero')
-      return
-    }
-
-    setPromptLoading(true)
-    setPromptMessage(null)
-
-    try {
-      const response = await fetch(`/api/tags/${tagsQuery.trim()}?page=1&limit=5&sort=recent`)
-      const data = await response.json().catch(() => ({}))
-      setApiPreview(JSON.stringify(data, null, 2))
-
-      if (!response.ok) {
-        showPromptMessage('error', data?.error?.message || `Error ${response.status}`)
-        return
-      }
-
-      showPromptMessage('ok', 'Detalle de tag obtenido')
-    } catch (error) {
-      showPromptMessage('error', error instanceof Error ? error.message : 'Error inesperado')
-    } finally {
-      setPromptLoading(false)
-    }
-  }
-
-  const handleFollowTag = async () => {
-    if (!tagsQuery.trim()) {
-      showPromptMessage('error', 'Escribe un tag slug primero')
-      return
-    }
-
-    setTagFollowLoading(true)
-    setPromptMessage(null)
-
-    try {
-      const response = await fetch(`/api/tags/${tagsQuery.trim()}/follow`, { method: 'POST' })
-      const data = await response.json().catch(() => ({}))
-      setApiPreview(JSON.stringify(data, null, 2))
-
-      if (!response.ok) {
-        showPromptMessage('error', data?.error?.message || `Error ${response.status}`)
-        return
-      }
-
-      showPromptMessage('ok', 'Tag seguido correctamente')
-    } catch (error) {
-      showPromptMessage('error', error instanceof Error ? error.message : 'Error inesperado')
-    } finally {
-      setTagFollowLoading(false)
-    }
-  }
-
-  const handleUnfollowTag = async () => {
-    if (!tagsQuery.trim()) {
-      showPromptMessage('error', 'Escribe un tag slug primero')
-      return
-    }
-
-    setTagFollowLoading(true)
-    setPromptMessage(null)
-
-    try {
-      const response = await fetch(`/api/tags/${tagsQuery.trim()}/follow`, { method: 'DELETE' })
-      const data = await response.json().catch(() => ({}))
-      setApiPreview(JSON.stringify(data, null, 2))
-
-      if (!response.ok) {
-        showPromptMessage('error', data?.error?.message || `Error ${response.status}`)
-        return
-      }
-
-      showPromptMessage('ok', 'Tag dejado de seguir')
-    } catch (error) {
-      showPromptMessage('error', error instanceof Error ? error.message : 'Error inesperado')
-    } finally {
-      setTagFollowLoading(false)
-    }
-  }
-
-  const handleSearch = async () => {
-    if (!searchQuery.trim()) {
-      showPromptMessage('error', 'Escribe una busqueda primero')
-      return
-    }
-
-    setPromptLoading(true)
-    setPromptMessage(null)
-
-    try {
-      const url = new URL('/api/search', window.location.origin)
-      url.searchParams.set('q', searchQuery)
-      url.searchParams.set('type', searchType)
-      url.searchParams.set('page', '1')
-      url.searchParams.set('limit', '10')
-
-      const response = await fetch(url)
-      const data = await response.json().catch(() => ({}))
-      setApiPreview(JSON.stringify(data, null, 2))
-
-      if (!response.ok) {
-        showPromptMessage('error', data?.error?.message || `Error ${response.status}`)
-        return
-      }
-
-      showPromptMessage('ok', `Busqueda completada: ${data.pagination?.total || 0} resultados`)
-    } catch (error) {
-      showPromptMessage('error', error instanceof Error ? error.message : 'Error inesperado')
-    } finally {
-      setPromptLoading(false)
-    }
-  }
-
-  const handleVote = async () => {
-    if (!votePromptId.trim()) {
-      showPromptMessage('error', 'Escribe un prompt id primero')
-      return
-    }
-
-    setPromptLoading(true)
-    setPromptMessage(null)
-
-    try {
-      const response = await fetch(`/api/prompts/${votePromptId.trim()}/vote`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ vote_type: voteType }),
-      })
-      const data = await response.json().catch(() => ({}))
-      setApiPreview(JSON.stringify(data, null, 2))
-
-      if (!response.ok) {
-        showPromptMessage('error', data?.error?.message || `Error ${response.status}`)
-        return
-      }
-
-      showPromptMessage('ok', `Voto ${data.vote_type} registrado`)
-    } catch (error) {
-      showPromptMessage('error', error instanceof Error ? error.message : 'Error inesperado')
-    } finally {
-      setPromptLoading(false)
-    }
-  }
-
-  const handleListComments = async () => {
-    if (!commentPromptId.trim()) {
-      showPromptMessage('error', 'Escribe un prompt id primero')
-      return
-    }
-
-    setPromptLoading(true)
-    setPromptMessage(null)
-
-    try {
-      const url = new URL(`/api/prompts/${commentPromptId.trim()}/comments`, window.location.origin)
-      url.searchParams.set('page', '1')
-      url.searchParams.set('limit', '10')
-
-      const response = await fetch(url)
-      const data = await response.json().catch(() => ({}))
-      setApiPreview(JSON.stringify(data, null, 2))
-
-      if (!response.ok) {
-        showPromptMessage('error', data?.error?.message || `Error ${response.status}`)
-        return
-      }
-
-      showPromptMessage('ok', 'Comentarios cargados')
-    } catch (error) {
-      showPromptMessage('error', error instanceof Error ? error.message : 'Error inesperado')
-    } finally {
-      setPromptLoading(false)
-    }
-  }
-
-  const handleCreateComment = async () => {
-    if (!commentPromptId.trim()) {
-      showPromptMessage('error', 'Escribe un prompt id primero')
-      return
-    }
-    if (!commentContent.trim()) {
-      showPromptMessage('error', 'Escribe el contenido del comentario')
-      return
-    }
-
-    setPromptLoading(true)
-    setPromptMessage(null)
-
-    try {
-      const response = await fetch(`/api/prompts/${commentPromptId.trim()}/comments`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: commentContent.trim() }),
-      })
-      const data = await response.json().catch(() => ({}))
-      setApiPreview(JSON.stringify(data, null, 2))
-
-      if (!response.ok) {
-        showPromptMessage('error', data?.error?.message || `Error ${response.status}`)
-        return
-      }
-
-      setCommentContent('')
-      showPromptMessage('ok', 'Comentario creado')
-    } catch (error) {
-      showPromptMessage('error', error instanceof Error ? error.message : 'Error inesperado')
-    } finally {
-      setPromptLoading(false)
-    }
-  }
-
-  const handleUpdateComment = async () => {
-    if (!commentPromptId.trim()) {
-      showPromptMessage('error', 'Escribe un prompt id primero')
-      return
-    }
-    if (!commentId.trim()) {
-      showPromptMessage('error', 'Escribe un comment id primero')
-      return
-    }
-    if (!commentContent.trim()) {
-      showPromptMessage('error', 'Escribe el contenido del comentario')
-      return
-    }
-
-    setPromptLoading(true)
-    setPromptMessage(null)
-
-    try {
-      const response = await fetch(`/api/prompts/${commentPromptId.trim()}/comments/${commentId.trim()}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: commentContent.trim() }),
-      })
-      const data = await response.json().catch(() => ({}))
-      setApiPreview(JSON.stringify(data, null, 2))
-
-      if (!response.ok) {
-        showPromptMessage('error', data?.error?.message || `Error ${response.status}`)
-        return
-      }
-
-      showPromptMessage('ok', 'Comentario actualizado')
-    } catch (error) {
-      showPromptMessage('error', error instanceof Error ? error.message : 'Error inesperado')
-    } finally {
-      setPromptLoading(false)
-    }
-  }
-
-  const handleDeleteComment = async () => {
-    if (!commentPromptId.trim()) {
-      showPromptMessage('error', 'Escribe un prompt id primero')
-      return
-    }
-    if (!commentId.trim()) {
-      showPromptMessage('error', 'Escribe un comment id primero')
-      return
-    }
-
-    setPromptLoading(true)
-    setPromptMessage(null)
-
-    try {
-      const response = await fetch(`/api/prompts/${commentPromptId.trim()}/comments/${commentId.trim()}`, {
-        method: 'DELETE',
-      })
-      const data = await response.json().catch(() => ({}))
-      setApiPreview(JSON.stringify(data, null, 2))
-
-      if (!response.ok) {
-        showPromptMessage('error', data?.error?.message || `Error ${response.status}`)
-        return
-      }
-
-      showPromptMessage('ok', 'Comentario eliminado')
-    } catch (error) {
-      showPromptMessage('error', error instanceof Error ? error.message : 'Error inesperado')
-    } finally {
-      setPromptLoading(false)
-    }
-  }
+  const prompts = response?.data ?? []
 
   return (
-    <div className="min-h-screen bg-slate-50 p-6 text-slate-900 md:p-10">
-      <div className="mx-auto grid w-full max-w-5xl gap-6 md:grid-cols-2">
-        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm md:p-8">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-            Prompt Marketplace
-          </p>
-          <h1 className="mt-3 text-3xl font-semibold leading-tight md:text-4xl">
-            Probar autenticación
-          </h1>
-          <p className="mt-3 text-sm text-slate-600">
-            Este formulario usa Better Auth para email/password y social login (Google y
-            GitHub).
-          </p>
+    <div className="min-h-screen bg-[#0b1020] text-slate-100">
+      <Sidebar active="home" />
 
-          <div className="mt-6 flex gap-2 rounded-xl bg-slate-100 p-1">
-            <button
-              type="button"
-              onClick={() => setMode('signin')}
-              className={`w-full rounded-lg px-3 py-2 text-sm font-medium transition ${
-                mode === 'signin'
-                  ? 'bg-white text-slate-900 shadow-sm'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              Iniciar sesión
-            </button>
-            <button
-              type="button"
-              onClick={() => setMode('signup')}
-              className={`w-full rounded-lg px-3 py-2 text-sm font-medium transition ${
-                mode === 'signup'
-                  ? 'bg-white text-slate-900 shadow-sm'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              Crear cuenta
-            </button>
-          </div>
+      <main className="flex min-h-screen min-w-0 flex-col lg:pl-72">
+          <div className="border-b border-white/10 bg-[#0c1326] px-4 py-4 shadow-[0_12px_40px_-28px_rgba(0,0,0,0.85)] sm:px-6 lg:px-8">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <div className="text-xs font-semibold uppercase tracking-[0.24em] text-cyan-300/80">Descubrimiento del Marketplace</div>
+                <h1 className="mt-2 text-3xl font-semibold tracking-tight text-white sm:text-4xl">Marketplace de Prompts</h1>
+              </div>
 
-          <form onSubmit={handleEmailAuth} className="mt-6 space-y-4">
-            {mode === 'signup' && (
-              <label className="block">
-                <span className="mb-1 block text-sm font-medium text-slate-700">Nombre</span>
-                <input
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="John Doe"
-                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm outline-none ring-indigo-500 transition focus:ring"
-                />
-              </label>
-            )}
+              <div className="flex flex-wrap gap-3">
+                {user && (
+                  <Link
+                    to="/create"
+                    className="inline-flex items-center justify-center gap-2 rounded-2xl bg-cyan-300 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-cyan-200"
+                  >
+                    <Sparkles className="h-4 w-4" />
+                    Crear Prompt
+                  </Link>
+                )}
+                {user && (
+                  <Link
+                    to="/my-prompts"
+                    className="inline-flex items-center justify-center rounded-2xl border border-white/10 px-4 py-3 text-sm font-medium text-slate-200 transition hover:bg-white/10"
+                  >
+                    Mis Prompts
+                  </Link>
+                )}
+              </div>
+            </div>
 
-            <label className="block">
-              <span className="mb-1 block text-sm font-medium text-slate-700">Email</span>
-              <input
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="john@example.com"
-                className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm outline-none ring-indigo-500 transition focus:ring"
-              />
-            </label>
+            <div className="mt-5 flex flex-col gap-3 rounded-3xl border border-white/10 bg-[#111a34] p-3 sm:flex-row sm:items-center">
+              <SearchBar />
 
-            <label className="block">
-              <span className="mb-1 block text-sm font-medium text-slate-700">Password</span>
-              <input
-                type="password"
-                required
-                minLength={8}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="********"
-                className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm outline-none ring-indigo-500 transition focus:ring"
-              />
-            </label>
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {loading
-                ? 'Procesando...'
-                : mode === 'signin'
-                  ? 'Entrar con email'
-                  : 'Registrar con email'}
-            </button>
-          </form>
-
-          <div className="mt-5 grid gap-2 sm:grid-cols-2">
-            <button
-              type="button"
-              onClick={() => handleSocial('google')}
-              disabled={loading}
-              className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              Continuar con Google
-            </button>
-            <button
-              type="button"
-              onClick={() => handleSocial('github')}
-              disabled={loading}
-              className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              Continuar con GitHub
-            </button>
-          </div>
-
-          {message && (
-            <p
-              className={`mt-5 rounded-xl px-3 py-2 text-sm ${
-                messageType === 'ok'
-                  ? 'bg-emerald-100 text-emerald-800'
-                  : messageType === 'error'
-                    ? 'bg-rose-100 text-rose-800'
-                    : 'bg-slate-100 text-slate-700'
-              }`}
-            >
-              {message}
-            </p>
-          )}
-        </section>
-
-        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm md:p-8">
-          <h2 className="text-xl font-semibold">Estado de sesión</h2>
-
-          <div className="mt-4 space-y-2 text-sm">
-            <p>
-              <span className="font-medium">Session status:</span>{' '}
-              <span className="text-slate-700">{session.isPending ? 'loading' : session.data ? 'active' : 'none'}</span>
-            </p>
-            <p>
-              <span className="font-medium">User ID:</span>{' '}
-              <span className="text-slate-700">{currentUser?.id || '-'}</span>
-            </p>
-            <p>
-              <span className="font-medium">Email:</span>{' '}
-              <span className="text-slate-700">{currentUser?.email || '-'}</span>
-            </p>
-            <p>
-              <span className="font-medium">Nombre:</span>{' '}
-              <span className="text-slate-700">{currentUser?.name || '-'}</span>
-            </p>
-          </div>
-
-          <button
-            type="button"
-            onClick={handleSignOut}
-            disabled={loading || !currentUser}
-            className="mt-5 w-full rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-900 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            Cerrar sesión
-          </button>
-
-          <hr className="my-6 border-slate-200" />
-
-          <h3 className="text-base font-semibold">Setup de perfil local</h3>
-          <p className="mt-1 text-sm text-slate-600">
-            Llama a <code>POST /api/users/setup</code> para crear registro en tabla User.
-          </p>
-
-          <label className="mt-4 block">
-            <span className="mb-1 block text-sm font-medium text-slate-700">Username</span>
-            <input
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              placeholder="johndoe"
-              className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm outline-none ring-indigo-500 transition focus:ring"
-            />
-          </label>
-
-          <button
-            type="button"
-            onClick={handleSetupProfile}
-            disabled={loading || !currentUser}
-            className="mt-4 w-full rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            Ejecutar setup
-          </button>
-        </section>
-
-        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm md:p-8 md:col-span-2">
-          <h2 className="text-xl font-semibold">Probar endpoints de Prompt</h2>
-          <p className="mt-1 text-sm text-slate-600">
-            Crea, consulta y genera prompt responses con selector de modelo y fallback manual.
-          </p>
-
-          <div className="mt-5 grid gap-4 md:grid-cols-2">
-            <label className="block">
-              <span className="mb-1 block text-sm font-medium text-slate-700">Prompt ID</span>
-              <input
-                value={promptId}
-                onChange={(e) => setPromptId(e.target.value)}
-                placeholder="uuid del prompt"
-                className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm outline-none ring-indigo-500 transition focus:ring"
-              />
-            </label>
-
-            <label className="block">
-              <span className="mb-1 block text-sm font-medium text-slate-700">Modelo</span>
-              <select
-                value={promptModel}
-                onChange={(e) => setPromptModel(e.target.value)}
-                className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm outline-none ring-indigo-500 transition focus:ring"
-              >
-                <option value="meta-llama/llama-3.3-70b-instruct:free">llama-3.3-70b (free)</option>
-                <option value="openai/gpt-4o-mini">gpt-4o-mini</option>
-                <option value="anthropic/claude-3.5-sonnet">claude-3.5-sonnet</option>
-              </select>
-            </label>
-
-            <label className="block md:col-span-2">
-              <span className="mb-1 block text-sm font-medium text-slate-700">Título</span>
-              <input
-                value={promptTitle}
-                onChange={(e) => setPromptTitle(e.target.value)}
-                placeholder="Code Reviewer Pro"
-                className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm outline-none ring-indigo-500 transition focus:ring"
-              />
-            </label>
-
-            <label className="block md:col-span-2">
-              <span className="mb-1 block text-sm font-medium text-slate-700">Contenido del prompt</span>
-              <textarea
-                value={promptContent}
-                onChange={(e) => setPromptContent(e.target.value)}
-                placeholder="You are an expert..."
-                rows={4}
-                className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm outline-none ring-indigo-500 transition focus:ring"
-              />
-            </label>
-
-            <label className="block">
-              <span className="mb-1 block text-sm font-medium text-slate-700">Descripción</span>
-              <input
-                value={promptDescription}
-                onChange={(e) => setPromptDescription(e.target.value)}
-                placeholder="Short description"
-                className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm outline-none ring-indigo-500 transition focus:ring"
-              />
-            </label>
-
-            <label className="block">
-              <span className="mb-1 block text-sm font-medium text-slate-700">Precio AI Points</span>
-              <input
-                value={promptPrice}
-                onChange={(e) => setPromptPrice(e.target.value)}
-                type="number"
-                min={0}
-                className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm outline-none ring-indigo-500 transition focus:ring"
-              />
-            </label>
-
-            <label className="block md:col-span-2">
-              <span className="mb-1 block text-sm font-medium text-slate-700">Tags (coma separadas)</span>
-              <input
-                value={promptTags}
-                onChange={(e) => setPromptTags(e.target.value)}
-                placeholder="coding, review"
-                className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm outline-none ring-indigo-500 transition focus:ring"
-              />
-            </label>
-
-            <label className="flex items-center gap-2 text-sm text-slate-700 md:col-span-2">
-              <input
-                type="checkbox"
-                checked={promptIsPublished}
-                onChange={(e) => setPromptIsPublished(e.target.checked)}
-              />
-              Publicar prompt
-            </label>
-
-            <label className="block md:col-span-2">
-              <span className="mb-1 block text-sm font-medium text-slate-700">
-                Respuesta manual (usa este campo cuando OpenRouter no esté disponible)
-              </span>
-              <textarea
-                value={manualGeneratedResponse}
-                onChange={(e) => setManualGeneratedResponse(e.target.value)}
-                placeholder="Pega aquí una respuesta manual..."
-                rows={4}
-                className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm outline-none ring-indigo-500 transition focus:ring"
-              />
-            </label>
-          </div>
-
-          <div className="mt-5 grid gap-2 md:grid-cols-4">
-            <button
-              type="button"
-              onClick={handleCreatePrompt}
-              disabled={promptLoading || !currentUser}
-              className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              Crear prompt
-            </button>
-            <button
-              type="button"
-              onClick={handleFetchPrompt}
-              disabled={promptLoading}
-              className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-900 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              Ver detalle
-            </button>
-            <button
-              type="button"
-              onClick={handleGeneratePromptResponse}
-              disabled={promptLoading || !currentUser}
-              className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              Generar response
-            </button>
-            <button
-              type="button"
-              onClick={handleListPrompts}
-              disabled={promptLoading}
-              className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-900 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              Listar prompts
-            </button>
-          </div>
-
-          <div className="mt-4 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4">
-            <h3 className="text-sm font-semibold uppercase tracking-[0.16em] text-slate-500">
-              Ejemplo de compra y ranking
-            </h3>
-            <p className="mt-2 text-sm text-slate-600">
-              Usa el mismo Prompt ID de arriba para comprar un prompt de ejemplo, o consulta el ranking global sin autenticación.
-            </p>
-
-            <div className="mt-4 grid gap-2 md:grid-cols-2">
-              <button
-                type="button"
-                onClick={handlePurchasePrompt}
-                disabled={promptLoading || !currentUser}
-                className="rounded-xl bg-amber-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-amber-500 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                Comprar prompt de ejemplo
-              </button>
-              <button
-                type="button"
-                onClick={handleFetchRanking}
-                disabled={promptLoading}
-                className="rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-900 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                Ver ranking global
-              </button>
+              <div className="flex items-center gap-2 text-xs text-slate-400">
+                <span className="rounded-full border border-white/10 bg-white/5 px-3 py-2">{response?.pagination.total ?? 0} prompts</span>
+              </div>
             </div>
           </div>
 
-          {promptMessage && (
-            <p
-              className={`mt-4 rounded-xl px-3 py-2 text-sm ${
-                promptMessageType === 'ok'
-                  ? 'bg-emerald-100 text-emerald-800'
-                  : promptMessageType === 'error'
-                    ? 'bg-rose-100 text-rose-800'
-                    : 'bg-slate-100 text-slate-700'
-              }`}
-            >
-              {promptMessage}
-            </p>
-          )}
+          <div className="flex-1 px-4 py-6 sm:px-6 lg:px-8">
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {loading ? (
+                Array.from({ length: pageSize }).map((_, index) => (
+                  <div key={index} className="h-44 animate-pulse rounded-3xl border border-white/10 bg-white/5" />
+                ))
+              ) : error ? (
+                <div className="rounded-3xl border border-rose-400/30 bg-rose-500/10 p-5 text-sm text-rose-200">{error}</div>
+              ) : prompts.length > 0 ? (
+                prompts.map((prompt) => (
+                  <PromptFeedCard
+                    key={prompt.id_prompt}
+                    prompt={prompt}
+                    currentUserId={user?.id ?? null}
+                    availableAipoints={user ? 100 : null}
+                    onClick={() => setSelectedPrompt(prompt)}
+                  />
+                ))
+              ) : (
+                <div className="rounded-3xl border border-white/10 bg-white/5 p-6 text-sm text-slate-300 md:col-span-2 xl:col-span-3">
+                  No hay prompts para mostrar.
+                </div>
+              )}
+            </div>
 
-          <pre className="mt-4 max-h-96 overflow-auto rounded-xl bg-slate-950 p-4 text-xs text-slate-100">
-            {apiPreview || 'Aquí aparecerá la respuesta JSON de los endpoints'}
-          </pre>
-        </section>
+            <div className="mt-6 flex flex-col gap-3 border-t border-white/10 pt-5 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-sm text-slate-400">
+                Página <span className="text-slate-100">{response?.pagination.page ?? page}</span> de <span className="text-slate-100">{totalPages}</span>
+              </p>
 
-        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm md:p-8 md:col-span-2">
-          <h2 className="text-xl font-semibold">Endpoints de Tags</h2>
-          <p className="mt-1 text-sm text-slate-600">
-            Lista tags, consulta detalle, sigue y deja de seguir.
-          </p>
+              <div className="flex items-center gap-2">
+                <button
+                  className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
+                  onClick={() => setPage((current) => Math.max(1, current - 1))}
+                  disabled={page <= 1 || loading}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                  Anterior
+                </button>
 
-          <div className="mt-5 grid gap-4 md:grid-cols-2">
-            <label className="block md:col-span-2">
-              <span className="mb-1 block text-sm font-medium text-slate-700">Tag Slug</span>
-              <input
-                value={tagsQuery}
-                onChange={(e) => setTagsQuery(e.target.value)}
-                placeholder="coding, ai, etc"
-                className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm outline-none ring-indigo-500 transition focus:ring"
-              />
-            </label>
+                <div className="flex items-center gap-1 rounded-2xl border border-white/10 bg-[#0e1427] p-1">
+                  {Array.from({ length: Math.min(totalPages, 5) }).map((_, index) => {
+                    const pageNumber = index + 1
+                    const active = pageNumber === page
+                    return (
+                      <button
+                        key={pageNumber}
+                        onClick={() => setPage(pageNumber)}
+                        className={`min-w-10 rounded-xl px-3 py-2 text-sm transition ${active ? 'bg-cyan-300 text-slate-950' : 'text-slate-300 hover:bg-white/10 hover:text-white'}`}
+                      >
+                        {pageNumber}
+                      </button>
+                    )
+                  })}
+                </div>
+
+                <button
+                  className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
+                  onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
+                  disabled={page >= totalPages || loading}
+                >
+                  Siguiente
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
           </div>
+      </main>
 
-          <div className="mt-5 grid gap-2 md:grid-cols-4">
-            <button
-              type="button"
-              onClick={handleListTags}
-              disabled={promptLoading}
-              className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              Listar tags
-            </button>
-            <button
-              type="button"
-              onClick={handleFetchTag}
-              disabled={promptLoading}
-              className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-900 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              Ver detalle
-            </button>
-            <button
-              type="button"
-              onClick={handleFollowTag}
-              disabled={tagFollowLoading || !currentUser}
-              className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              Seguir tag
-            </button>
-            <button
-              type="button"
-              onClick={handleUnfollowTag}
-              disabled={tagFollowLoading || !currentUser}
-              className="rounded-xl bg-rose-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-rose-500 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              Dejar de seguir
-            </button>
-          </div>
-        </section>
-
-        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm md:p-8 md:col-span-2">
-          <h2 className="text-xl font-semibold">Endpoints de Search</h2>
-          <p className="mt-1 text-sm text-slate-600">
-            Busca prompts por query, tipo all o tag.
-          </p>
-
-          <div className="mt-5 grid gap-4 md:grid-cols-2">
-            <label className="block">
-              <span className="mb-1 block text-sm font-medium text-slate-700">Query</span>
-              <input
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="buscar prompts..."
-                className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm outline-none ring-indigo-500 transition focus:ring"
-              />
-            </label>
-
-            <label className="block">
-              <span className="mb-1 block text-sm font-medium text-slate-700">Tipo</span>
-              <select
-                value={searchType}
-                onChange={(e) => setSearchType(e.target.value as 'all' | 'tag')}
-                className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm outline-none ring-indigo-500 transition focus:ring"
-              >
-                <option value="all">Todos</option>
-                <option value="tag">Por tag</option>
-              </select>
-            </label>
-          </div>
-
-          <button
-            type="button"
-            onClick={handleSearch}
-            disabled={promptLoading}
-            className="mt-5 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            Buscar
-          </button>
-        </section>
-
-        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm md:p-8 md:col-span-2">
-          <h2 className="text-xl font-semibold">Endpoints de Votes</h2>
-          <p className="mt-1 text-sm text-slate-600">
-            Vota por un prompt (up/down).
-          </p>
-
-          <div className="mt-5 grid gap-4 md:grid-cols-2">
-            <label className="block">
-              <span className="mb-1 block text-sm font-medium text-slate-700">Prompt ID</span>
-              <input
-                value={votePromptId}
-                onChange={(e) => setVotePromptId(e.target.value)}
-                placeholder="uuid del prompt"
-                className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm outline-none ring-indigo-500 transition focus:ring"
-              />
-            </label>
-
-            <label className="block">
-              <span className="mb-1 block text-sm font-medium text-slate-700">Tipo de voto</span>
-              <select
-                value={voteType}
-                onChange={(e) => setVoteType(e.target.value as 'up' | 'down')}
-                className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm outline-none ring-indigo-500 transition focus:ring"
-              >
-                <option value="up">Upvote</option>
-                <option value="down">Downvote</option>
-              </select>
-            </label>
-          </div>
-
-          <button
-            type="button"
-            onClick={handleVote}
-            disabled={promptLoading || !currentUser}
-            className="mt-5 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            Votar
-          </button>
-        </section>
-
-        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm md:p-8 md:col-span-2">
-          <h2 className="text-xl font-semibold">Endpoints de Comments</h2>
-          <p className="mt-1 text-sm text-slate-600">
-            Lista, crea, actualiza y elimina comentarios.
-          </p>
-
-          <div className="mt-5 grid gap-4 md:grid-cols-2">
-            <label className="block">
-              <span className="mb-1 block text-sm font-medium text-slate-700">Prompt ID</span>
-              <input
-                value={commentPromptId}
-                onChange={(e) => setCommentPromptId(e.target.value)}
-                placeholder="uuid del prompt"
-                className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm outline-none ring-indigo-500 transition focus:ring"
-              />
-            </label>
-
-            <label className="block">
-              <span className="mb-1 block text-sm font-medium text-slate-700">Comment ID (para update/delete)</span>
-              <input
-                value={commentId}
-                onChange={(e) => setCommentId(e.target.value)}
-                placeholder="uuid del comentario"
-                className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm outline-none ring-indigo-500 transition focus:ring"
-              />
-            </label>
-
-            <label className="block md:col-span-2">
-              <span className="mb-1 block text-sm font-medium text-slate-700">Contenido</span>
-              <textarea
-                value={commentContent}
-                onChange={(e) => setCommentContent(e.target.value)}
-                placeholder="Escribe tu comentario..."
-                rows={3}
-                className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm outline-none ring-indigo-500 transition focus:ring"
-              />
-            </label>
-          </div>
-
-          <div className="mt-5 grid gap-2 md:grid-cols-4">
-            <button
-              type="button"
-              onClick={handleListComments}
-              disabled={promptLoading}
-              className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-900 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              Listar
-            </button>
-            <button
-              type="button"
-              onClick={handleCreateComment}
-              disabled={promptLoading || !currentUser}
-              className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              Crear
-            </button>
-            <button
-              type="button"
-              onClick={handleUpdateComment}
-              disabled={promptLoading || !currentUser}
-              className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              Actualizar
-            </button>
-            <button
-              type="button"
-              onClick={handleDeleteComment}
-              disabled={promptLoading || !currentUser}
-              className="rounded-xl bg-rose-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-rose-500 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              Eliminar
-            </button>
-          </div>
-        </section>
-      </div>
+      <PromptDetailModal
+        open={Boolean(selectedPrompt)}
+        promptId={selectedPrompt?.id_prompt ?? null}
+        fallbackPrompt={selectedPrompt}
+        onClose={() => setSelectedPrompt(null)}
+      />
     </div>
   )
 }
