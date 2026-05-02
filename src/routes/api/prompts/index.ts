@@ -15,6 +15,12 @@ type PromptBody = {
   aipoints_price?: number
   is_published?: boolean
   tags?: string[]
+  response?: {
+    content?: string
+    model?: string
+    tokens_prompt?: number
+    tokens_response?: number
+  }
 }
 
 const parseNumber = (value: string | null, fallback: number) => {
@@ -22,8 +28,10 @@ const parseNumber = (value: string | null, fallback: number) => {
   return Number.isFinite(parsed) ? parsed : fallback
 }
 
-if (import.meta.vitest) {
-  const { describe, it, expect } = import.meta.vitest
+const vitest = (import.meta as ImportMeta & { vitest?: typeof import('vitest') }).vitest
+
+if (vitest) {
+  const { describe, it, expect } = vitest
 
   describe('parseNumber', () => {
     it('returns fallback when value is not numeric', () => {
@@ -103,6 +111,14 @@ export const Route = createFileRoute('/api/prompts/')({
           aipointsPrice,
           isPublished: Boolean(body.is_published),
           tags: Array.isArray(body.tags) ? body.tags : [],
+          response: body.response?.content
+            ? {
+                content: body.response.content,
+                model: body.response.model ?? null,
+                tokensPrompt: body.response.tokens_prompt ?? null,
+                tokensResponse: body.response.tokens_response ?? null,
+              }
+            : undefined,
         })
 
         return Response.json(created, { status: 201 })
