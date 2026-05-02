@@ -9,9 +9,18 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as SearchRouteImport } from './routes/search'
+import { Route as RankingRouteImport } from './routes/ranking'
+import { Route as MyPromptsRouteImport } from './routes/my-prompts'
+import { Route as FavoritesRouteImport } from './routes/favorites'
+import { Route as CreateRouteImport } from './routes/create'
+import { Route as AuthRouteImport } from './routes/auth'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as TagsSlugRouteImport } from './routes/tags/$slug'
+import { Route as PromptsIdRouteImport } from './routes/prompts/$id'
 import { Route as ApiSearchRouteImport } from './routes/api/search'
 import { Route as ApiRankingRouteImport } from './routes/api/ranking'
+import { Route as ApiGenerateResponseRouteImport } from './routes/api/generate-response'
 import { Route as ApiTagsIndexRouteImport } from './routes/api/tags/index'
 import { Route as ApiPromptsIndexRouteImport } from './routes/api/prompts/index'
 import { Route as ApiUsersSetupRouteImport } from './routes/api/users/setup'
@@ -19,6 +28,9 @@ import { Route as ApiUsersMeRouteImport } from './routes/api/users/me'
 import { Route as ApiTagsSlugRouteImport } from './routes/api/tags/$slug'
 import { Route as ApiPromptsIdRouteImport } from './routes/api/prompts/$id'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
+import { Route as ApiUsersMePromptsRouteImport } from './routes/api/users/me/prompts'
+import { Route as ApiUsersMeFollowingTagsRouteImport } from './routes/api/users/me/following-tags'
+import { Route as ApiUsersMeFavoritesRouteImport } from './routes/api/users/me/favorites'
 import { Route as ApiTagsSlugFollowRouteImport } from './routes/api/tags/$slug/follow'
 import { Route as ApiPromptsIdVoteRouteImport } from './routes/api/prompts/$id/vote'
 import { Route as ApiPromptsIdPurchaseRouteImport } from './routes/api/prompts/$id/purchase'
@@ -26,9 +38,49 @@ import { Route as ApiPromptsIdGenerateResponseRouteImport } from './routes/api/p
 import { Route as ApiPromptsIdCommentsIndexRouteImport } from './routes/api/prompts/$id/comments/index'
 import { Route as ApiPromptsIdCommentsComment_idRouteImport } from './routes/api/prompts/$id/comments/$comment_id'
 
+const SearchRoute = SearchRouteImport.update({
+  id: '/search',
+  path: '/search',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RankingRoute = RankingRouteImport.update({
+  id: '/ranking',
+  path: '/ranking',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MyPromptsRoute = MyPromptsRouteImport.update({
+  id: '/my-prompts',
+  path: '/my-prompts',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FavoritesRoute = FavoritesRouteImport.update({
+  id: '/favorites',
+  path: '/favorites',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CreateRoute = CreateRouteImport.update({
+  id: '/create',
+  path: '/create',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthRoute = AuthRouteImport.update({
+  id: '/auth',
+  path: '/auth',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TagsSlugRoute = TagsSlugRouteImport.update({
+  id: '/tags/$slug',
+  path: '/tags/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PromptsIdRoute = PromptsIdRouteImport.update({
+  id: '/prompts/$id',
+  path: '/prompts/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiSearchRoute = ApiSearchRouteImport.update({
@@ -39,6 +91,11 @@ const ApiSearchRoute = ApiSearchRouteImport.update({
 const ApiRankingRoute = ApiRankingRouteImport.update({
   id: '/api/ranking',
   path: '/api/ranking',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiGenerateResponseRoute = ApiGenerateResponseRouteImport.update({
+  id: '/api/generate-response',
+  path: '/api/generate-response',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiTagsIndexRoute = ApiTagsIndexRouteImport.update({
@@ -76,6 +133,21 @@ const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   path: '/api/auth/$',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiUsersMePromptsRoute = ApiUsersMePromptsRouteImport.update({
+  id: '/prompts',
+  path: '/prompts',
+  getParentRoute: () => ApiUsersMeRoute,
+} as any)
+const ApiUsersMeFollowingTagsRoute = ApiUsersMeFollowingTagsRouteImport.update({
+  id: '/following-tags',
+  path: '/following-tags',
+  getParentRoute: () => ApiUsersMeRoute,
+} as any)
+const ApiUsersMeFavoritesRoute = ApiUsersMeFavoritesRouteImport.update({
+  id: '/favorites',
+  path: '/favorites',
+  getParentRoute: () => ApiUsersMeRoute,
+} as any)
 const ApiTagsSlugFollowRoute = ApiTagsSlugFollowRouteImport.update({
   id: '/follow',
   path: '/follow',
@@ -112,12 +184,21 @@ const ApiPromptsIdCommentsComment_idRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/auth': typeof AuthRoute
+  '/create': typeof CreateRoute
+  '/favorites': typeof FavoritesRoute
+  '/my-prompts': typeof MyPromptsRoute
+  '/ranking': typeof RankingRoute
+  '/search': typeof SearchRoute
+  '/api/generate-response': typeof ApiGenerateResponseRoute
   '/api/ranking': typeof ApiRankingRoute
   '/api/search': typeof ApiSearchRoute
+  '/prompts/$id': typeof PromptsIdRoute
+  '/tags/$slug': typeof TagsSlugRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/prompts/$id': typeof ApiPromptsIdRouteWithChildren
   '/api/tags/$slug': typeof ApiTagsSlugRouteWithChildren
-  '/api/users/me': typeof ApiUsersMeRoute
+  '/api/users/me': typeof ApiUsersMeRouteWithChildren
   '/api/users/setup': typeof ApiUsersSetupRoute
   '/api/prompts/': typeof ApiPromptsIndexRoute
   '/api/tags/': typeof ApiTagsIndexRoute
@@ -125,17 +206,29 @@ export interface FileRoutesByFullPath {
   '/api/prompts/$id/purchase': typeof ApiPromptsIdPurchaseRoute
   '/api/prompts/$id/vote': typeof ApiPromptsIdVoteRoute
   '/api/tags/$slug/follow': typeof ApiTagsSlugFollowRoute
+  '/api/users/me/favorites': typeof ApiUsersMeFavoritesRoute
+  '/api/users/me/following-tags': typeof ApiUsersMeFollowingTagsRoute
+  '/api/users/me/prompts': typeof ApiUsersMePromptsRoute
   '/api/prompts/$id/comments/$comment_id': typeof ApiPromptsIdCommentsComment_idRoute
   '/api/prompts/$id/comments/': typeof ApiPromptsIdCommentsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/auth': typeof AuthRoute
+  '/create': typeof CreateRoute
+  '/favorites': typeof FavoritesRoute
+  '/my-prompts': typeof MyPromptsRoute
+  '/ranking': typeof RankingRoute
+  '/search': typeof SearchRoute
+  '/api/generate-response': typeof ApiGenerateResponseRoute
   '/api/ranking': typeof ApiRankingRoute
   '/api/search': typeof ApiSearchRoute
+  '/prompts/$id': typeof PromptsIdRoute
+  '/tags/$slug': typeof TagsSlugRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/prompts/$id': typeof ApiPromptsIdRouteWithChildren
   '/api/tags/$slug': typeof ApiTagsSlugRouteWithChildren
-  '/api/users/me': typeof ApiUsersMeRoute
+  '/api/users/me': typeof ApiUsersMeRouteWithChildren
   '/api/users/setup': typeof ApiUsersSetupRoute
   '/api/prompts': typeof ApiPromptsIndexRoute
   '/api/tags': typeof ApiTagsIndexRoute
@@ -143,18 +236,30 @@ export interface FileRoutesByTo {
   '/api/prompts/$id/purchase': typeof ApiPromptsIdPurchaseRoute
   '/api/prompts/$id/vote': typeof ApiPromptsIdVoteRoute
   '/api/tags/$slug/follow': typeof ApiTagsSlugFollowRoute
+  '/api/users/me/favorites': typeof ApiUsersMeFavoritesRoute
+  '/api/users/me/following-tags': typeof ApiUsersMeFollowingTagsRoute
+  '/api/users/me/prompts': typeof ApiUsersMePromptsRoute
   '/api/prompts/$id/comments/$comment_id': typeof ApiPromptsIdCommentsComment_idRoute
   '/api/prompts/$id/comments': typeof ApiPromptsIdCommentsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/auth': typeof AuthRoute
+  '/create': typeof CreateRoute
+  '/favorites': typeof FavoritesRoute
+  '/my-prompts': typeof MyPromptsRoute
+  '/ranking': typeof RankingRoute
+  '/search': typeof SearchRoute
+  '/api/generate-response': typeof ApiGenerateResponseRoute
   '/api/ranking': typeof ApiRankingRoute
   '/api/search': typeof ApiSearchRoute
+  '/prompts/$id': typeof PromptsIdRoute
+  '/tags/$slug': typeof TagsSlugRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/prompts/$id': typeof ApiPromptsIdRouteWithChildren
   '/api/tags/$slug': typeof ApiTagsSlugRouteWithChildren
-  '/api/users/me': typeof ApiUsersMeRoute
+  '/api/users/me': typeof ApiUsersMeRouteWithChildren
   '/api/users/setup': typeof ApiUsersSetupRoute
   '/api/prompts/': typeof ApiPromptsIndexRoute
   '/api/tags/': typeof ApiTagsIndexRoute
@@ -162,6 +267,9 @@ export interface FileRoutesById {
   '/api/prompts/$id/purchase': typeof ApiPromptsIdPurchaseRoute
   '/api/prompts/$id/vote': typeof ApiPromptsIdVoteRoute
   '/api/tags/$slug/follow': typeof ApiTagsSlugFollowRoute
+  '/api/users/me/favorites': typeof ApiUsersMeFavoritesRoute
+  '/api/users/me/following-tags': typeof ApiUsersMeFollowingTagsRoute
+  '/api/users/me/prompts': typeof ApiUsersMePromptsRoute
   '/api/prompts/$id/comments/$comment_id': typeof ApiPromptsIdCommentsComment_idRoute
   '/api/prompts/$id/comments/': typeof ApiPromptsIdCommentsIndexRoute
 }
@@ -169,8 +277,17 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/auth'
+    | '/create'
+    | '/favorites'
+    | '/my-prompts'
+    | '/ranking'
+    | '/search'
+    | '/api/generate-response'
     | '/api/ranking'
     | '/api/search'
+    | '/prompts/$id'
+    | '/tags/$slug'
     | '/api/auth/$'
     | '/api/prompts/$id'
     | '/api/tags/$slug'
@@ -182,13 +299,25 @@ export interface FileRouteTypes {
     | '/api/prompts/$id/purchase'
     | '/api/prompts/$id/vote'
     | '/api/tags/$slug/follow'
+    | '/api/users/me/favorites'
+    | '/api/users/me/following-tags'
+    | '/api/users/me/prompts'
     | '/api/prompts/$id/comments/$comment_id'
     | '/api/prompts/$id/comments/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/auth'
+    | '/create'
+    | '/favorites'
+    | '/my-prompts'
+    | '/ranking'
+    | '/search'
+    | '/api/generate-response'
     | '/api/ranking'
     | '/api/search'
+    | '/prompts/$id'
+    | '/tags/$slug'
     | '/api/auth/$'
     | '/api/prompts/$id'
     | '/api/tags/$slug'
@@ -200,13 +329,25 @@ export interface FileRouteTypes {
     | '/api/prompts/$id/purchase'
     | '/api/prompts/$id/vote'
     | '/api/tags/$slug/follow'
+    | '/api/users/me/favorites'
+    | '/api/users/me/following-tags'
+    | '/api/users/me/prompts'
     | '/api/prompts/$id/comments/$comment_id'
     | '/api/prompts/$id/comments'
   id:
     | '__root__'
     | '/'
+    | '/auth'
+    | '/create'
+    | '/favorites'
+    | '/my-prompts'
+    | '/ranking'
+    | '/search'
+    | '/api/generate-response'
     | '/api/ranking'
     | '/api/search'
+    | '/prompts/$id'
+    | '/tags/$slug'
     | '/api/auth/$'
     | '/api/prompts/$id'
     | '/api/tags/$slug'
@@ -218,18 +359,30 @@ export interface FileRouteTypes {
     | '/api/prompts/$id/purchase'
     | '/api/prompts/$id/vote'
     | '/api/tags/$slug/follow'
+    | '/api/users/me/favorites'
+    | '/api/users/me/following-tags'
+    | '/api/users/me/prompts'
     | '/api/prompts/$id/comments/$comment_id'
     | '/api/prompts/$id/comments/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AuthRoute: typeof AuthRoute
+  CreateRoute: typeof CreateRoute
+  FavoritesRoute: typeof FavoritesRoute
+  MyPromptsRoute: typeof MyPromptsRoute
+  RankingRoute: typeof RankingRoute
+  SearchRoute: typeof SearchRoute
+  ApiGenerateResponseRoute: typeof ApiGenerateResponseRoute
   ApiRankingRoute: typeof ApiRankingRoute
   ApiSearchRoute: typeof ApiSearchRoute
+  PromptsIdRoute: typeof PromptsIdRoute
+  TagsSlugRoute: typeof TagsSlugRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
   ApiPromptsIdRoute: typeof ApiPromptsIdRouteWithChildren
   ApiTagsSlugRoute: typeof ApiTagsSlugRouteWithChildren
-  ApiUsersMeRoute: typeof ApiUsersMeRoute
+  ApiUsersMeRoute: typeof ApiUsersMeRouteWithChildren
   ApiUsersSetupRoute: typeof ApiUsersSetupRoute
   ApiPromptsIndexRoute: typeof ApiPromptsIndexRoute
   ApiTagsIndexRoute: typeof ApiTagsIndexRoute
@@ -237,11 +390,67 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/search': {
+      id: '/search'
+      path: '/search'
+      fullPath: '/search'
+      preLoaderRoute: typeof SearchRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/ranking': {
+      id: '/ranking'
+      path: '/ranking'
+      fullPath: '/ranking'
+      preLoaderRoute: typeof RankingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/my-prompts': {
+      id: '/my-prompts'
+      path: '/my-prompts'
+      fullPath: '/my-prompts'
+      preLoaderRoute: typeof MyPromptsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/favorites': {
+      id: '/favorites'
+      path: '/favorites'
+      fullPath: '/favorites'
+      preLoaderRoute: typeof FavoritesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/create': {
+      id: '/create'
+      path: '/create'
+      fullPath: '/create'
+      preLoaderRoute: typeof CreateRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auth': {
+      id: '/auth'
+      path: '/auth'
+      fullPath: '/auth'
+      preLoaderRoute: typeof AuthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/tags/$slug': {
+      id: '/tags/$slug'
+      path: '/tags/$slug'
+      fullPath: '/tags/$slug'
+      preLoaderRoute: typeof TagsSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/prompts/$id': {
+      id: '/prompts/$id'
+      path: '/prompts/$id'
+      fullPath: '/prompts/$id'
+      preLoaderRoute: typeof PromptsIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/search': {
@@ -256,6 +465,13 @@ declare module '@tanstack/react-router' {
       path: '/api/ranking'
       fullPath: '/api/ranking'
       preLoaderRoute: typeof ApiRankingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/generate-response': {
+      id: '/api/generate-response'
+      path: '/api/generate-response'
+      fullPath: '/api/generate-response'
+      preLoaderRoute: typeof ApiGenerateResponseRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/tags/': {
@@ -306,6 +522,27 @@ declare module '@tanstack/react-router' {
       fullPath: '/api/auth/$'
       preLoaderRoute: typeof ApiAuthSplatRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/api/users/me/prompts': {
+      id: '/api/users/me/prompts'
+      path: '/prompts'
+      fullPath: '/api/users/me/prompts'
+      preLoaderRoute: typeof ApiUsersMePromptsRouteImport
+      parentRoute: typeof ApiUsersMeRoute
+    }
+    '/api/users/me/following-tags': {
+      id: '/api/users/me/following-tags'
+      path: '/following-tags'
+      fullPath: '/api/users/me/following-tags'
+      preLoaderRoute: typeof ApiUsersMeFollowingTagsRouteImport
+      parentRoute: typeof ApiUsersMeRoute
+    }
+    '/api/users/me/favorites': {
+      id: '/api/users/me/favorites'
+      path: '/favorites'
+      fullPath: '/api/users/me/favorites'
+      preLoaderRoute: typeof ApiUsersMeFavoritesRouteImport
+      parentRoute: typeof ApiUsersMeRoute
     }
     '/api/tags/$slug/follow': {
       id: '/api/tags/$slug/follow'
@@ -384,14 +621,39 @@ const ApiTagsSlugRouteWithChildren = ApiTagsSlugRoute._addFileChildren(
   ApiTagsSlugRouteChildren,
 )
 
+interface ApiUsersMeRouteChildren {
+  ApiUsersMeFavoritesRoute: typeof ApiUsersMeFavoritesRoute
+  ApiUsersMeFollowingTagsRoute: typeof ApiUsersMeFollowingTagsRoute
+  ApiUsersMePromptsRoute: typeof ApiUsersMePromptsRoute
+}
+
+const ApiUsersMeRouteChildren: ApiUsersMeRouteChildren = {
+  ApiUsersMeFavoritesRoute: ApiUsersMeFavoritesRoute,
+  ApiUsersMeFollowingTagsRoute: ApiUsersMeFollowingTagsRoute,
+  ApiUsersMePromptsRoute: ApiUsersMePromptsRoute,
+}
+
+const ApiUsersMeRouteWithChildren = ApiUsersMeRoute._addFileChildren(
+  ApiUsersMeRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AuthRoute: AuthRoute,
+  CreateRoute: CreateRoute,
+  FavoritesRoute: FavoritesRoute,
+  MyPromptsRoute: MyPromptsRoute,
+  RankingRoute: RankingRoute,
+  SearchRoute: SearchRoute,
+  ApiGenerateResponseRoute: ApiGenerateResponseRoute,
   ApiRankingRoute: ApiRankingRoute,
   ApiSearchRoute: ApiSearchRoute,
+  PromptsIdRoute: PromptsIdRoute,
+  TagsSlugRoute: TagsSlugRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
   ApiPromptsIdRoute: ApiPromptsIdRouteWithChildren,
   ApiTagsSlugRoute: ApiTagsSlugRouteWithChildren,
-  ApiUsersMeRoute: ApiUsersMeRoute,
+  ApiUsersMeRoute: ApiUsersMeRouteWithChildren,
   ApiUsersSetupRoute: ApiUsersSetupRoute,
   ApiPromptsIndexRoute: ApiPromptsIndexRoute,
   ApiTagsIndexRoute: ApiTagsIndexRoute,

@@ -38,7 +38,7 @@ export async function generateFromOpenRouter(input: {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: 'minimax/minimax-m2.5:free', //input.model,
+        model: input.model,
         messages: [
           {
             role: "system",

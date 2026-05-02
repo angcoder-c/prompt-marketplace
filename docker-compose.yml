@@ -10,6 +10,9 @@ services:
     build: .
     depends_on:
       - libsql
+    environment:
+      TURSO_DATABASE_URL: http://libsql:8080
+      TURSO_AUTH_TOKEN: ${TURSO_AUTH_TOKEN}
     command: node scripts/init-db.mjs
 
   app:
@@ -20,3 +23,14 @@ services:
       - "3000:3000"
     environment:
       DATABASE_URL: http://libsql:8080
+      TURSO_DATABASE_URL: http://libsql:8080
+      TURSO_AUTH_TOKEN: ${TURSO_AUTH_TOKEN}
+      GOOGLE_OAUTH_CLIENT_ID: ${GOOGLE_OAUTH_CLIENT_ID}
+      GOOGLE_OAUTH_CLIENT_SECRET: ${GOOGLE_OAUTH_CLIENT_SECRET}
+      GITHUB_OAUTH_CLIENT_ID: ${GITHUB_OAUTH_CLIENT_ID}
+      GITHUB_OAUTH_CLIENT_SECRET: ${GITHUB_OAUTH_CLIENT_SECRET}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
+      BETTER_AUTH_URL: http://localhost:3000
+      BETTER_AUTH_TRUSTED_ORIGINS: http://localhost:3000,http://app:3000
+      LLAMA_MODEL: ${LLAMA_MODEL}
+      OPENROUTER_KEY: ${OPENROUTER_KEY}

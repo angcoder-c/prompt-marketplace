@@ -134,7 +134,8 @@ export async function createMarketplaceUserProfile(input: {
 				avatar_url,
 				aipoints,
 				airank
-			) VALUES (?, ?, ?, ?, ?, ?, 100, 0)
+			) VALUES (?, ?, ?, ?, ?, ?, 1000, 0)
+
 		`,
 		args: [
 			input.idUser,
@@ -207,6 +208,7 @@ export type PromptRow = {
 	tags: string[];
 	response_preview: {
 		content: string | null;
+		model: string | null;
 		tokens_prompt: number | null;
 		tokens_response: number | null;
 	};
@@ -221,6 +223,12 @@ type CreatePromptInput = {
 	aipointsPrice?: number;
 	isPublished?: boolean;
 	tags?: string[];
+	response?: {
+		content: string;
+		model?: string | null;
+		tokensPrompt?: number | null;
+		tokensResponse?: number | null;
+	};
 };
 
 type UpdatePromptInput = {
@@ -238,6 +246,7 @@ export type PromptResponseRow = {
 	id_response: string;
 	prompt_id: string;
 	content: string;
+	model: string | null;
 	tokens_prompt: number | null;
 	tokens_response: number | null;
 	generated_at: string;
@@ -268,6 +277,7 @@ const toPromptListRow = (row: Record<string, unknown>): PromptRow => ({
 		: [],
 	response_preview: {
 		content: row.response_content ? String(row.response_content) : null,
+		model: row.response_model ? String(row.response_model) : null,
 		tokens_prompt:
 			row.response_tokens_prompt !== null && row.response_tokens_prompt !== undefined
 				? Number(row.response_tokens_prompt)
@@ -283,6 +293,7 @@ const toPromptResponseRow = (row: Record<string, unknown>): PromptResponseRow =>
 	id_response: String(row.id_response),
 	prompt_id: String(row.prompt_id),
 	content: String(row.content),
+	model: row.model ? String(row.model) : null,
 	tokens_prompt:
 		row.tokens_prompt !== null && row.tokens_prompt !== undefined
 			? Number(row.tokens_prompt)
@@ -392,7 +403,29 @@ export async function createPrompt(input: CreatePromptInput) {
 		],
 	});
 
+	// Increment airank if prompt is published
+	if (input.isPublished) {
+		await db.execute({
+			sql: `
+				UPDATE User
+				SET airank = airank + 1
+				WHERE id_user = ?
+			`,
+			args: [input.userId],
+		});
+	}
+
 	await replacePromptTags(idPrompt, input.tags);
+
+	if (input.response?.content) {
+		await createPromptResponse({
+			promptId: idPrompt,
+			content: input.response.content,
+			model: input.response.model ?? null,
+			tokensPrompt: input.response.tokensPrompt ?? null,
+			tokensResponse: input.response.tokensResponse ?? null,
+		});
+	}
 
 	return findPromptById(idPrompt);
 }
@@ -426,13 +459,28 @@ export async function updatePrompt(input: UpdatePromptInput) {
 		args.push(Math.max(0, input.aipointsPrice));
 	}
 
+	// Check if publish status is changing
+	let publishStatusChanged = false;
+	let isNowPublished = false;
 	if (input.isPublished !== undefined) {
 		updates.push("is_published = ?");
 		args.push(input.isPublished ? 1 : 0);
+		publishStatusChanged = true;
+		isNowPublished = input.isPublished;
 	}
 
 	if (updates.length > 0) {
 		updates.push("updated_at = datetime('now')");
+
+		// Get original publish status if changing
+		let originalPrompt = null;
+		if (publishStatusChanged) {
+			const result = await db.execute({
+				sql: `SELECT user_id, is_published FROM Prompt WHERE id_prompt = ? LIMIT 1`,
+				args: [input.promptId],
+			});
+			originalPrompt = result.rows[0] as Record<string, unknown> | undefined;
+		}
 
 		await db.execute({
 			sql: `
@@ -442,6 +490,26 @@ export async function updatePrompt(input: UpdatePromptInput) {
 			`,
 			args: [...args, input.promptId],
 		});
+
+		// Update airank if publish status changed
+		if (publishStatusChanged && originalPrompt) {
+			const wasPublished = Number(originalPrompt.is_published ?? 0) === 1;
+			const userId = String(originalPrompt.user_id);
+			
+			if (isNowPublished && !wasPublished) {
+				// Publishing: give 100 aipoints
+				await db.execute({
+					sql: `UPDATE User SET aipoints = aipoints + 100 WHERE id_user = ?`,
+					args: [userId],
+				});
+			} else if (!isNowPublished && wasPublished) {
+				// Unpublishing: remove 100 aipoints
+				await db.execute({
+					sql: `UPDATE User SET aipoints = MAX(0, aipoints - 100) WHERE id_user = ?`,
+					args: [userId],
+				});
+			}
+		}
 	}
 
 	await replacePromptTags(input.promptId, input.tags);
@@ -482,81 +550,81 @@ export async function purchasePrompt(input: {
 	buyerUserId: string;
 	promptId: string;
 }) {
-	const transaction = await db.transaction();
+	const promptResult = await db.execute({
+		sql: `
+			SELECT
+				p.id_prompt,
+				p.user_id,
+				p.content,
+				p.aipoints_price,
+				p.is_published,
+				buyer.aipoints
+			FROM Prompt p
+			JOIN User buyer ON buyer.id_user = ?
+			WHERE p.id_prompt = ?
+			LIMIT 1
+		`,
+		args: [input.buyerUserId, input.promptId],
+	});
 
-	try {
-		const promptResult = await transaction.execute({
-			sql: `
-				SELECT
-					p.id_prompt,
-					p.user_id,
-					p.content,
-					p.aipoints_price,
-					p.is_published,
-					buyer.aipoints
-				FROM Prompt p
-				JOIN User buyer ON buyer.id_user = ?
-				WHERE p.id_prompt = ?
-				LIMIT 1
-			`,
-			args: [input.buyerUserId, input.promptId],
-		});
+	const promptRow = promptResult.rows[0] as Record<string, unknown> | undefined;
+	if (!promptRow) {
+		return { status: 'not_found' as const };
+	}
 
-		const promptRow = promptResult.rows[0] as Record<string, unknown> | undefined;
-		if (!promptRow) {
-			await transaction.rollback();
-			return { status: 'not_found' as const };
-		}
+	if (String(promptRow.user_id) === input.buyerUserId) {
+		return { status: 'forbidden' as const };
+	}
 
-		if (String(promptRow.user_id) === input.buyerUserId) {
-			await transaction.rollback();
-			return { status: 'forbidden' as const };
-		}
+	if (Number(promptRow.is_published ?? 0) !== 1) {
+		return { status: 'not_found' as const };
+	}
 
-		if (Number(promptRow.is_published ?? 0) !== 1) {
-			await transaction.rollback();
-			return { status: 'not_found' as const };
-		}
+	const existingPurchaseResult = await db.execute({
+		sql: `
+			SELECT id_purchase
+			FROM Purchase
+			WHERE buyer_user_id = ? AND prompt_id = ?
+			LIMIT 1
+		`,
+		args: [input.buyerUserId, input.promptId],
+	});
 
-		const existingPurchaseResult = await transaction.execute({
-			sql: `
-				SELECT id_purchase
-				FROM Purchase
-				WHERE buyer_user_id = ? AND prompt_id = ?
-				LIMIT 1
-			`,
-			args: [input.buyerUserId, input.promptId],
-		});
+	if (existingPurchaseResult.rows[0]) {
+		return { status: 'already_purchased' as const };
+	}
 
-		if (existingPurchaseResult.rows[0]) {
-			await transaction.rollback();
-			return { status: 'already_purchased' as const };
-		}
+	const availableAipoints = Number(promptRow.aipoints ?? 0);
+	const aipointsSpent = Math.max(0, Number(promptRow.aipoints_price ?? 0));
 
-		const availableAipoints = Number(promptRow.aipoints ?? 0);
-		const aipointsSpent = Math.max(0, Number(promptRow.aipoints_price ?? 0));
+	if (availableAipoints < aipointsSpent) {
+		return {
+			status: 'insufficient_aipoints' as const,
+			required: aipointsSpent,
+			available: availableAipoints,
+		};
+	}
 
-		if (availableAipoints < aipointsSpent) {
-			await transaction.rollback();
-			return {
-				status: 'insufficient_aipoints' as const,
-				required: aipointsSpent,
-				available: availableAipoints,
-			};
-		}
+	const purchaseId = randomUUID();
 
-		const purchaseId = randomUUID();
-
-		await transaction.execute({
+	await db.batch([
+		{
 			sql: `
 				UPDATE User
 				SET aipoints = aipoints - ?, updated_at = datetime('now')
+				WHERE id_user = ? AND aipoints >= ?
+			`,
+			args: [aipointsSpent, input.buyerUserId, aipointsSpent],
+		},
+		{
+			sql: `
+				UPDATE User
+				SET aipoints = aipoints + ?, updated_at = datetime('now')
 				WHERE id_user = ?
 			`,
-			args: [aipointsSpent, input.buyerUserId],
-		});
-
-		await transaction.execute({
+			args: [aipointsSpent, String(promptRow.user_id)],
+		},
+		{
 			sql: `
 				INSERT INTO Purchase (
 					id_purchase,
@@ -566,41 +634,35 @@ export async function purchasePrompt(input: {
 				) VALUES (?, ?, ?, ?)
 			`,
 			args: [purchaseId, input.buyerUserId, input.promptId, aipointsSpent],
-		});
+		},
+	], "write");
 
-		const purchaseResult = await transaction.execute({
-			sql: `
-				SELECT id_purchase, prompt_id, aipoints_spent, purchased_at
-				FROM Purchase
-				WHERE id_purchase = ?
-				LIMIT 1
-			`,
-			args: [purchaseId],
-		});
+	const purchaseResult = await db.execute({
+		sql: `
+			SELECT id_purchase, prompt_id, aipoints_spent, purchased_at
+			FROM Purchase
+			WHERE id_purchase = ?
+			LIMIT 1
+		`,
+		args: [purchaseId],
+	});
 
-		const purchaseRow = purchaseResult.rows[0] as Record<string, unknown> | undefined;
-		if (!purchaseRow) {
-			await transaction.rollback();
-			return { status: 'not_found' as const };
-		}
-
-		await transaction.commit();
-
-		return {
-			status: 'ok' as const,
-			purchase: {
-				id_purchase: String(purchaseRow.id_purchase),
-				prompt_id: String(purchaseRow.prompt_id),
-				aipoints_spent: Number(purchaseRow.aipoints_spent ?? 0),
-				remaining_aipoints: availableAipoints - aipointsSpent,
-				prompt_content: String(promptRow.content ?? ''),
-				purchased_at: String(purchaseRow.purchased_at),
-			},
-		};
-	} catch (error) {
-		await transaction.rollback().catch(() => undefined)
-		throw error
+	const purchaseRow = purchaseResult.rows[0] as Record<string, unknown> | undefined;
+	if (!purchaseRow) {
+		return { status: 'not_found' as const };
 	}
+
+	return {
+		status: 'ok' as const,
+		purchase: {
+			id_purchase: String(purchaseRow.id_purchase),
+			prompt_id: String(purchaseRow.prompt_id),
+			aipoints_spent: Number(purchaseRow.aipoints_spent ?? 0),
+			remaining_aipoints: availableAipoints - aipointsSpent,
+			prompt_content: String(promptRow.content ?? ''),
+			purchased_at: String(purchaseRow.purchased_at),
+		},
+	};
 }
 
 export async function findPromptById(promptId: string) {
@@ -636,6 +698,13 @@ export async function findPromptById(promptId: string) {
 					ORDER BY pr.generated_at DESC
 					LIMIT 1
 				) AS response_content,
+				(
+					SELECT pr.model
+					FROM PromptResponse pr
+					WHERE pr.prompt_id = p.id_prompt
+					ORDER BY pr.generated_at DESC
+					LIMIT 1
+				) AS response_model,
 				(
 					SELECT pr.tokens_prompt
 					FROM PromptResponse pr
@@ -763,6 +832,13 @@ export async function listPublishedPrompts(input: {
 					ORDER BY pr.generated_at DESC
 					LIMIT 1
 				) AS response_content,
+				(
+					SELECT pr.model
+					FROM PromptResponse pr
+					WHERE pr.prompt_id = p.id_prompt
+					ORDER BY pr.generated_at DESC
+					LIMIT 1
+				) AS response_model,
 				(
 					SELECT pr.tokens_prompt
 					FROM PromptResponse pr
@@ -934,6 +1010,7 @@ export async function listRanking(input: {
 export async function createPromptResponse(input: {
 	promptId: string;
 	content: string;
+	model?: string | null;
 	tokensPrompt?: number | null;
 	tokensResponse?: number | null;
 }) {
@@ -945,14 +1022,16 @@ export async function createPromptResponse(input: {
 				id_response,
 				prompt_id,
 				content,
+				model,
 				tokens_prompt,
 				tokens_response
-			) VALUES (?, ?, ?, ?, ?)
+			) VALUES (?, ?, ?, ?, ?, ?)
 		`,
 		args: [
 			idResponse,
 			input.promptId,
 			input.content,
+			input.model ?? null,
 			input.tokensPrompt ?? null,
 			input.tokensResponse ?? null,
 		],
@@ -960,7 +1039,7 @@ export async function createPromptResponse(input: {
 
 	const result = await db.execute({
 		sql: `
-			SELECT id_response, prompt_id, content, tokens_prompt, tokens_response, generated_at
+			SELECT id_response, prompt_id, content, model, tokens_prompt, tokens_response, generated_at
 			FROM PromptResponse
 			WHERE id_response = ?
 			LIMIT 1
@@ -1080,12 +1159,107 @@ async function getPromptVoteCounts(promptId: string) {
 	};
 }
 
+const userPromptListSql = `
+	SELECT
+		p.id_prompt,
+		p.user_id,
+		p.title,
+		p.content,
+		p.description,
+		p.model,
+		p.aipoints_price,
+		p.uses_count,
+		p.is_published,
+		p.created_at,
+		p.updated_at,
+		u.username,
+		u.avatar_url,
+		u.airank,
+		(SELECT COUNT(*) FROM Vote v1 WHERE v1.prompt_id = p.id_prompt AND v1.vote_type = 1) AS upvotes,
+		(SELECT COUNT(*) FROM Vote v2 WHERE v2.prompt_id = p.id_prompt AND v2.vote_type = -1) AS downvotes,
+		(
+			SELECT GROUP_CONCAT(t.slug)
+			FROM PromptTag pt
+			JOIN Tag t ON t.id_tag = pt.tag_id
+			WHERE pt.prompt_id = p.id_prompt
+		) AS tags_csv,
+		(
+			SELECT pr.content
+			FROM PromptResponse pr
+			WHERE pr.prompt_id = p.id_prompt
+			ORDER BY pr.generated_at DESC
+			LIMIT 1
+		) AS response_content,
+		(
+			SELECT pr.model
+			FROM PromptResponse pr
+			WHERE pr.prompt_id = p.id_prompt
+			ORDER BY pr.generated_at DESC
+			LIMIT 1
+		) AS response_model,
+		(
+			SELECT pr.tokens_prompt
+			FROM PromptResponse pr
+			WHERE pr.prompt_id = p.id_prompt
+			ORDER BY pr.generated_at DESC
+			LIMIT 1
+		) AS response_tokens_prompt,
+		(
+			SELECT pr.tokens_response
+			FROM PromptResponse pr
+			WHERE pr.prompt_id = p.id_prompt
+			ORDER BY pr.generated_at DESC
+			LIMIT 1
+		) AS response_tokens_response
+	FROM Prompt p
+	JOIN User u ON u.id_user = p.user_id
+`;
+
+export async function listPromptsCreatedByUser(userId: string) {
+	const result = await db.execute({
+		sql: `
+			${userPromptListSql}
+			WHERE p.user_id = ?
+			ORDER BY p.created_at DESC
+		`,
+		args: [userId],
+	});
+
+	return {
+		data: result.rows.map((row) => toPromptListRow(row as Record<string, unknown>)),
+	};
+}
+
+export async function listPurchasedPromptsByUser(userId: string) {
+	const result = await db.execute({
+		sql: `
+			${userPromptListSql}
+			JOIN Purchase pu ON pu.prompt_id = p.id_prompt
+			WHERE pu.buyer_user_id = ?
+			ORDER BY pu.purchased_at DESC
+		`,
+		args: [userId],
+	});
+
+	return {
+		data: result.rows.map((row) => toPromptListRow(row as Record<string, unknown>)),
+	};
+}
+
 export async function applyPromptVote(input: {
 	userId: string;
 	promptId: string;
 	voteType: "up" | "down";
 }) {
 	const nextVoteValue = input.voteType === "up" ? 1 : -1;
+
+	// Get prompt owner for airank update
+	const promptResult = await db.execute({
+		sql: `SELECT user_id FROM Prompt WHERE id_prompt = ? LIMIT 1`,
+		args: [input.promptId],
+	});
+	const promptOwner = promptResult.rows[0] as Record<string, unknown> | undefined;
+	const ownerId = promptOwner ? String(promptOwner.user_id) : null;
 
 	const existingResult = await db.execute({
 		sql: `
@@ -1105,18 +1279,42 @@ export async function applyPromptVote(input: {
 		const currentVoteValue = Number(existing.vote_type ?? 0);
 
 		if (currentVoteValue === nextVoteValue) {
+			// Removing vote
 			await db.execute({
 				sql: `DELETE FROM Vote WHERE id_vote = ?`,
 				args: [String(existing.id_vote)],
 			});
+			// Update airank: remove upvote if it was an upvote
+			if (currentVoteValue === 1 && ownerId) {
+				await db.execute({
+					sql: `UPDATE User SET airank = MAX(0, airank - 1) WHERE id_user = ?`,
+					args: [ownerId],
+				});
+			}
 			persistedVote = null;
 		} else {
+			// Changing vote
 			await db.execute({
 				sql: `UPDATE Vote SET vote_type = ?, created_at = datetime('now') WHERE id_vote = ?`,
 				args: [nextVoteValue, String(existing.id_vote)],
 			});
+			// Update airank: if changing to upvote, increase; if removing upvote (changing to down), decrease
+			if (ownerId) {
+				if (nextVoteValue === 1 && currentVoteValue !== 1) {
+					await db.execute({
+						sql: `UPDATE User SET airank = airank + 1 WHERE id_user = ?`,
+						args: [ownerId],
+					});
+				} else if (nextVoteValue !== 1 && currentVoteValue === 1) {
+					await db.execute({
+						sql: `UPDATE User SET airank = MAX(0, airank - 1) WHERE id_user = ?`,
+						args: [ownerId],
+					});
+				}
+			}
 		}
 	} else {
+		// New vote
 		await db.execute({
 			sql: `
 				INSERT INTO Vote (id_vote, user_id, prompt_id, vote_type)
@@ -1124,6 +1322,13 @@ export async function applyPromptVote(input: {
 			`,
 			args: [randomUUID(), input.userId, input.promptId, nextVoteValue],
 		});
+		// Update airank: if it's an upvote, increase
+		if (nextVoteValue === 1 && ownerId) {
+			await db.execute({
+				sql: `UPDATE User SET airank = airank + 1 WHERE id_user = ?`,
+				args: [ownerId],
+			});
+		}
 	}
 
 	const counts = await getPromptVoteCounts(input.promptId);
@@ -1415,6 +1620,13 @@ export async function searchPrompts(input: {
 					LIMIT 1
 				) AS response_content,
 				(
+					SELECT pr.model
+					FROM PromptResponse pr
+					WHERE pr.prompt_id = p.id_prompt
+					ORDER BY pr.generated_at DESC
+					LIMIT 1
+				) AS response_model,
+				(
 					SELECT pr.tokens_prompt
 					FROM PromptResponse pr
 					WHERE pr.prompt_id = p.id_prompt
@@ -1523,6 +1735,13 @@ export async function listPromptsByTag(input: {
 					LIMIT 1
 				) AS response_content,
 				(
+					SELECT pr.model
+					FROM PromptResponse pr
+					WHERE pr.prompt_id = p.id_prompt
+					ORDER BY pr.generated_at DESC
+					LIMIT 1
+				) AS response_model,
+				(
 					SELECT pr.tokens_prompt
 					FROM PromptResponse pr
 					WHERE pr.prompt_id = p.id_prompt
@@ -1583,6 +1802,147 @@ export async function listPromptsByTag(input: {
 				limit: safeLimit,
 				total: Number(totalRow?.total ?? 0),
 			},
+		},
+	};
+}
+
+export async function listFollowingTagsByUser(userId: string) {
+	const result = await db.execute({
+		sql: `
+			SELECT
+				t.id_tag,
+				t.name,
+				t.slug,
+				t.description,
+				uf.followed_at
+			FROM UserTagFollow uf
+			JOIN Tag t ON t.id_tag = uf.tag_id
+			WHERE uf.user_id = ?
+			ORDER BY uf.followed_at DESC
+		`,
+		args: [userId],
+	});
+
+	return {
+		data: result.rows.map((row) => ({
+			id_tag: String(row.id_tag),
+			name: String(row.name),
+			slug: String(row.slug),
+			description: row.description ? String(row.description) : null,
+			followed_at: String(row.followed_at),
+		})),
+	};
+}
+
+export async function listPromptsFollowedByUser(input: {
+	userId: string;
+	page: number;
+	limit: number;
+	sort: PromptSort;
+}) {
+	const safePage = Math.max(1, input.page);
+	const safeLimit = Math.min(50, Math.max(1, input.limit));
+	const offset = (safePage - 1) * safeLimit;
+
+	const orderByMap: Record<PromptSort, string> = {
+		recent: "p.created_at DESC",
+		popular: "p.uses_count DESC, p.created_at DESC",
+		top_rated:
+			"((SELECT COUNT(*) FROM Vote v1 WHERE v1.prompt_id = p.id_prompt AND v1.vote_type = 1) - (SELECT COUNT(*) FROM Vote v2 WHERE v2.prompt_id = p.id_prompt AND v2.vote_type = -1)) DESC, p.created_at DESC",
+	};
+
+	const followedClause = `
+		EXISTS (
+			SELECT 1
+			FROM PromptTag pt
+			JOIN UserTagFollow uf ON uf.tag_id = pt.tag_id
+			WHERE pt.prompt_id = p.id_prompt
+			AND uf.user_id = ?
+		)
+	`;
+
+	const totalResult = await db.execute({
+		sql: `
+			SELECT COUNT(DISTINCT p.id_prompt) AS total
+			FROM Prompt p
+			WHERE p.is_published = 1
+			AND ${followedClause}
+		`,
+		args: [input.userId],
+	});
+
+	const rowsResult = await db.execute({
+		sql: `
+			SELECT
+				p.id_prompt,
+				p.user_id,
+				p.title,
+				p.content,
+				p.description,
+				p.model,
+				p.aipoints_price,
+				p.uses_count,
+				p.is_published,
+				p.created_at,
+				p.updated_at,
+				u.username,
+				u.avatar_url,
+				u.airank,
+				(SELECT COUNT(*) FROM Vote v1 WHERE v1.prompt_id = p.id_prompt AND v1.vote_type = 1) AS upvotes,
+				(SELECT COUNT(*) FROM Vote v2 WHERE v2.prompt_id = p.id_prompt AND v2.vote_type = -1) AS downvotes,
+				(
+					SELECT GROUP_CONCAT(t.slug)
+					FROM PromptTag pt
+					JOIN Tag t ON t.id_tag = pt.tag_id
+					WHERE pt.prompt_id = p.id_prompt
+				) AS tags_csv,
+				(
+					SELECT pr.content
+					FROM PromptResponse pr
+					WHERE pr.prompt_id = p.id_prompt
+					ORDER BY pr.generated_at DESC
+					LIMIT 1
+				) AS response_content,
+				(
+					SELECT pr.model
+					FROM PromptResponse pr
+					WHERE pr.prompt_id = p.id_prompt
+					ORDER BY pr.generated_at DESC
+					LIMIT 1
+				) AS response_model,
+				(
+					SELECT pr.tokens_prompt
+					FROM PromptResponse pr
+					WHERE pr.prompt_id = p.id_prompt
+					ORDER BY pr.generated_at DESC
+					LIMIT 1
+				) AS response_tokens_prompt,
+				(
+					SELECT pr.tokens_response
+					FROM PromptResponse pr
+					WHERE pr.prompt_id = p.id_prompt
+					ORDER BY pr.generated_at DESC
+					LIMIT 1
+				) AS response_tokens_response
+			FROM Prompt p
+			JOIN User u ON u.id_user = p.user_id
+			WHERE p.is_published = 1
+			AND ${followedClause}
+			ORDER BY ${orderByMap[input.sort]}
+			LIMIT ? OFFSET ?
+		`,
+		args: [input.userId, safeLimit, offset],
+	});
+
+	const totalRow = totalResult.rows[0] as Record<string, unknown> | undefined;
+	const data = rowsResult.rows.map((row) => toPromptListRow(row as Record<string, unknown>));
+
+	return {
+		data,
+		pagination: {
+			page: safePage,
+			limit: safeLimit,
+			total: Number(totalRow?.total ?? 0),
 		},
 	};
 }

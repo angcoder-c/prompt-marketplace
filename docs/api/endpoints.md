@@ -11,6 +11,8 @@
 - [Prompts](#prompts)
 - [Respuestas de Prompts (AI)](#respuestas-de-prompts-ai)
 - [Tags](#tags)
+- [User tags followed](#user-tags-followed)
+- [Favorites feed](#favorites-feed)
 - [Votes](#votes)
 - [Comments](#comments)
 - [Purchases](#purchases)
@@ -139,7 +141,7 @@ Crea el perfil de usuario en la tabla `User` tras el primer login/registro. Bett
   "email": "john@example.com",
   "avatar_url": "https://lh3.googleusercontent.com/...",
   "bio": null,
-  "aipoints": 100,
+  "aipoints": 1000,
   "created_at": "2025-04-23T14:30:00Z"
 }
 ```
@@ -167,6 +169,94 @@ Retorna el perfil del usuario autenticado.
   "airank": 142.5,
   "created_at": "2025-04-01T10:00:00Z",
   "updated_at": "2025-04-23T14:30:00Z"
+}
+```
+
+---
+
+### `GET /api/users/me/prompts`
+Devuelve los prompts creados por el usuario autenticado y los prompts que ya compró.
+
+**Auth requerida:** Sí (cookie de sesión)
+
+**Response `200 OK`:**
+```json
+{
+  "created": [
+    {
+      "id_prompt": "prompt_abc123",
+      "title": "Code Reviewer Pro",
+      "description": "Reviews your code with detailed feedback",
+      "model": "claude-sonnet-4",
+      "aipoints_price": 25,
+      "upvotes": 15,
+      "downvotes": 1,
+      "uses_count": 38,
+      "tags": ["coding", "review"],
+      "created_at": "2025-04-10T09:00:00Z"
+    }
+  ],
+  "purchased": [
+    {
+      "id_prompt": "prompt_xyz789",
+      "title": "System Prompt Optimizer",
+      "description": "Helps improve system prompts before publishing",
+      "model": "gpt-4.1-mini",
+      "aipoints_price": 15,
+      "upvotes": 8,
+      "downvotes": 0,
+      "uses_count": 12,
+      "tags": ["prompting", "optimization"],
+      "created_at": "2025-04-18T11:20:00Z"
+    }
+  ]
+}
+```
+
+**Errores:**
+- `401` — sesión inválida o expirada
+- `404` — perfil no creado todavía
+
+---
+
+### `GET /api/users/me/following-tags`
+Devuelve las categorías que sigue el usuario autenticado.
+
+**Auth requerida:** Sí (cookie de sesión)
+
+**Response `200 OK`:**
+```json
+{
+  "data": [
+    {
+      "id_tag": "2",
+      "name": "Coding",
+      "slug": "coding",
+      "description": "Programming and code-related prompts",
+      "followed_at": "2025-04-10T10:00:00Z"
+    }
+  ]
+}
+```
+
+---
+
+### `GET /api/users/me/favorites`
+Prompts publicados en las categorías que sigue el usuario autenticado.
+
+**Auth requerida:** Sí (cookie de sesión)
+
+**Query Params:** `page`, `limit`, `sort`
+
+**Response `200 OK`:**
+```json
+{
+  "data": "misma estructura que GET /api/prompts",
+  "pagination": {
+    "page": 1,
+    "limit": 20,
+    "total": 12
+  }
 }
 ```
 
@@ -316,7 +406,7 @@ Historial de movimientos de AI Points.
     },
     {
       "type": "signup_bonus",
-      "amount": 100,
+      "amount": 1000,
       "description": "Welcome bonus",
       "reference_id": null,
       "created_at": "2025-04-01T10:00:00Z"
