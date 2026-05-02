@@ -3,7 +3,10 @@ import { createAuthClient } from "better-auth/react";
 // export const authClient = createAuthClient();
 
 export const authClient = createAuthClient({
-  baseURL: typeof window !== "undefined"
-    ? window.location.origin
-    : process.env.BETTER_AUTH_URL ?? "http://localhost:3000",
+  baseURL: import.meta.env.VITE_APP_URL ?? "http://localhost:3000",
+  fetchOptions: {
+    onError: (ctx) => {
+      console.error("[auth-client error]", ctx.response?.status, ctx.error);
+    }
+  }
 });
