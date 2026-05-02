@@ -11,7 +11,7 @@ PRAGMA foreign_keys = ON;
 
 -- TABLE: User
 CREATE TABLE IF NOT EXISTS User (
-    id_user TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(4))) || '-' || lower(hex(randomblob(2))) || '-4' || substr(lower(hex(randomblob(2))),2) || '-' || substr('89ab', abs(random()) % 4 + 1, 1) || substr(lower(hex(randomblob(2))),2) || '-' || lower(hex(randomblob(6)))),
+    id_user TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
     username TEXT NOT NULL,
     email TEXT NOT NULL,
     password_hash TEXT,
@@ -21,8 +21,8 @@ CREATE TABLE IF NOT EXISTS User (
     bio TEXT,
     airank INTEGER DEFAULT 0,
     aipoints INTEGER DEFAULT 0,
-    created_at TEXT DEFAULT (datetime('now')),
-    updated_at TEXT DEFAULT (datetime('now'))
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS uk_user_username ON User(username);
@@ -31,7 +31,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS uk_user_provider ON User(provider, provider_id
 
 -- TABLE: Tag
 CREATE TABLE IF NOT EXISTS Tag (
-    id_tag TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(4))) || '-' || lower(hex(randomblob(2))) || '-4' || substr(lower(hex(randomblob(2))),2) || '-' || substr('89ab', abs(random()) % 4 + 1, 1) || substr(lower(hex(randomblob(2))),2) || '-' || lower(hex(randomblob(6)))),
+    id_tag TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
     name TEXT NOT NULL,
     slug TEXT NOT NULL,
     description TEXT,
@@ -42,9 +42,8 @@ CREATE UNIQUE INDEX IF NOT EXISTS uk_tag_name ON Tag(name);
 CREATE UNIQUE INDEX IF NOT EXISTS uk_tag_slug ON Tag(slug);
 
 -- TABLE: Prompt
--- upvotes y downvotes removidos: se calculan desde la tabla Vote
 CREATE TABLE IF NOT EXISTS Prompt (
-    id_prompt TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(4))) || '-' || lower(hex(randomblob(2))) || '-4' || substr(lower(hex(randomblob(2))),2) || '-' || substr('89ab', abs(random()) % 4 + 1, 1) || substr(lower(hex(randomblob(2))),2) || '-' || lower(hex(randomblob(6)))),
+    id_prompt TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
     user_id TEXT NOT NULL,
     title TEXT NOT NULL,
     content TEXT NOT NULL,
@@ -89,9 +88,10 @@ CREATE INDEX IF NOT EXISTS idx_usertagfollow_tag_id ON UserTagFollow(tag_id);
 
 -- TABLE: PromptResponse
 CREATE TABLE IF NOT EXISTS PromptResponse (
-    id_response TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(4))) || '-' || lower(hex(randomblob(2))) || '-4' || substr(lower(hex(randomblob(2))),2) || '-' || substr('89ab', abs(random()) % 4 + 1, 1) || substr(lower(hex(randomblob(2))),2) || '-' || lower(hex(randomblob(6)))),
+    id_response TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
     prompt_id TEXT NOT NULL,
     content TEXT NOT NULL,
+    model TEXT,
     tokens_prompt INTEGER,
     tokens_response INTEGER,
     generated_at TEXT DEFAULT (datetime('now')),
@@ -102,7 +102,7 @@ CREATE INDEX IF NOT EXISTS idx_promptresponse_prompt_id ON PromptResponse(prompt
 
 -- TABLE: Vote
 CREATE TABLE IF NOT EXISTS Vote (
-    id_vote TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(4))) || '-' || lower(hex(randomblob(2))) || '-4' || substr(lower(hex(randomblob(2))),2) || '-' || substr('89ab', abs(random()) % 4 + 1, 1) || substr(lower(hex(randomblob(2))),2) || '-' || lower(hex(randomblob(6)))),
+    id_vote TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
     user_id TEXT NOT NULL,
     prompt_id TEXT NOT NULL,
     vote_type INTEGER NOT NULL CHECK(vote_type IN (-1, 1)),
@@ -117,7 +117,7 @@ CREATE INDEX IF NOT EXISTS idx_vote_vote_type ON Vote(vote_type);
 
 -- TABLE: Comment
 CREATE TABLE IF NOT EXISTS Comment (
-    id_comment TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(4))) || '-' || lower(hex(randomblob(2))) || '-4' || substr(lower(hex(randomblob(2))),2) || '-' || substr('89ab', abs(random()) % 4 + 1, 1) || substr(lower(hex(randomblob(2))),2) || '-' || lower(hex(randomblob(6)))),
+    id_comment TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
     user_id TEXT NOT NULL,
     prompt_id TEXT NOT NULL,
     content TEXT NOT NULL,
@@ -133,7 +133,7 @@ CREATE INDEX IF NOT EXISTS idx_comment_created_at ON Comment(created_at);
 
 -- TABLE: Purchase
 CREATE TABLE IF NOT EXISTS Purchase (
-    id_purchase TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(4))) || '-' || lower(hex(randomblob(2))) || '-4' || substr(lower(hex(randomblob(2))),2) || '-' || substr('89ab', abs(random()) % 4 + 1, 1) || substr(lower(hex(randomblob(2))),2) || '-' || lower(hex(randomblob(6)))),
+    id_purchase TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
     buyer_user_id TEXT NOT NULL,
     prompt_id TEXT NOT NULL,
     aipoints_spent INTEGER NOT NULL,
