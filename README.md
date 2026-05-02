@@ -29,6 +29,43 @@ Proyecto pensado para practicar SQL real sobre un caso de negocio tipo marketpla
 | Estado | Zustand | Estado global simple |
 | Iconos | react-icons | UI consistente |
 
+## Localización (Español)
+
+La interfaz de usuario está completamente localizada al español. Los siguientes elementos están traducidos:
+
+- ✅ Etiquetas de formularios (labels, placeholders, botones)
+- ✅ Mensajes de navegación y notificaciones
+- ✅ Secciones de contenido (títulos, descripciones)
+- ✅ Mensajes de error y éxito
+- ✅ Estados de carga
+- ✅ Paginación
+
+### Términos técnicos preservados en inglés
+
+Los siguientes términos técnicos se mantienen en inglés para consistencia global:
+
+- **Marketplace** - Nombre del producto
+- **PromptForge** - Referencia a la plataforma
+- **airank** - Sistema de ranking de usuarios
+- **AIP** - Moneda interna (AI Points)
+- **Prompt** - Unidad principal de contenido
+- Nombres de modelos de IA (OpenAI, Llama, Claude, etc.)
+- Endpoints y rutas de API
+
+### Guía para mantener la consistencia
+
+Al agregar nuevas características, traduce:
+- Todos los textos de UI visibles al usuario
+- Mensajes de validación y error
+- Placeholders en campos de entrada
+- Etiquetas y descripciones
+
+Mantén en inglés:
+- Identificadores técnicos (IDs, slugs)
+- Nombres de propiedades en datos
+- Comentarios de código técnico
+- Logs de sistema
+
 ## Quick Start
 
 ### 1. Levantar libsql local
