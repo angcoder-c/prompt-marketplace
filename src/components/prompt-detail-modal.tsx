@@ -66,11 +66,13 @@ export function PromptDetailModal({
   open,
   onClose,
   fallbackPrompt,
+  mode = 'modal',
 }: {
   promptId: string | null
   open: boolean
   onClose: () => void
   fallbackPrompt?: Partial<PromptDetail> | null
+  mode?: 'modal' | 'page'
 }) {
   const [prompt, setPrompt] = useState<PromptDetail | null>(null)
   const [loading, setLoading] = useState(false)
@@ -172,6 +174,19 @@ export function PromptDetailModal({
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [open, onClose])
+
+  useEffect(() => {
+    if (!open || mode !== 'modal' || typeof document === 'undefined') {
+      return
+    }
+
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+
+    return () => {
+      document.body.style.overflow = previousOverflow
+    }
+  }, [open, mode])
 
   useEffect(() => {
     if (!open || !promptId || !prompt) return
@@ -412,23 +427,15 @@ export function PromptDetailModal({
     }
   }
 
-  if (!open || typeof document === 'undefined') {
+  if (!open) {
     return null
   }
 
-  return createPortal(
-    <div
-      className="fixed inset-0 z-50 flex items-start justify-center bg-[#050816]/80 px-4 py-6 backdrop-blur-md overflow-y-auto"
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget) {
-          onClose()
-        }
-      }}
-    >
-      <div className="relative w-full max-w-4xl my-8 rounded-4xl border border-white/10 bg-[#0c1326] shadow-[0_24px_120px_-40px_rgba(0,0,0,0.95)] max-h-[80vh] overflow-y-auto">
-        <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-cyan-300 via-fuchsia-300 to-violet-300" />
+  const panel = (
+    <div className="relative w-full rounded-4xl border border-white/10 bg-[#0c1326] shadow-[0_24px_120px_-40px_rgba(0,0,0,0.95)] overflow-hidden">
+      <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-cyan-300 via-fuchsia-300 to-violet-300" />
 
-        <div className="flex items-start justify-between gap-4 border-b border-white/10 px-5 py-4 sm:px-6">
+      <div className="flex items-start justify-between gap-4 border-b border-white/10 px-5 py-4 sm:px-6">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.22em] text-cyan-300/80">Detalle del prompt</p>
             <h2 className="mt-2 text-2xl font-semibold tracking-tight text-white sm:text-3xl">
@@ -467,6 +474,7 @@ export function PromptDetailModal({
           </div>
         </div>
 
+      <div className="max-h-[calc(92vh-96px)] overflow-y-auto">
         <div className="grid gap-0 lg:grid-cols-[minmax(0,1.3fr)_minmax(300px,0.7fr)]">
           <div className="space-y-5 p-5 sm:p-6">
             {loading && !resolvedPrompt ? (
@@ -777,6 +785,31 @@ export function PromptDetailModal({
           </div>
         </div>
       </div>
+    </div>
+  )
+
+  if (mode === 'page') {
+    return (
+      <div className="min-h-screen bg-[#0b1020] px-4 py-6 text-slate-100 sm:px-6 lg:px-8">
+        <div className="mx-auto w-full max-w-5xl">{panel}</div>
+      </div>
+    )
+  }
+
+  if (typeof document === 'undefined') {
+    return null
+  }
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-50 flex items-start justify-center bg-[#050816]/80 px-3 py-3 backdrop-blur-md sm:items-center sm:px-4 sm:py-6"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) {
+          onClose()
+        }
+      }}
+    >
+      <div className="w-full max-w-5xl max-h-[92vh]">{panel}</div>
     </div>,
     document.body,
   )
