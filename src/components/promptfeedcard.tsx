@@ -66,7 +66,6 @@ export function PromptFeedCard({
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-cyan-200/80">Prompt del Marketplace</div>
           <h3 className="mt-2 truncate text-lg font-semibold text-white">{prompt.title}</h3>
         </div>
         <span className="rounded-full border border-violet-300/30 bg-violet-300/10 px-2.5 py-1 text-xs font-semibold text-violet-200">
