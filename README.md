@@ -81,6 +81,8 @@ Recursos de diseno y documentación del proyecto:
 | Normalizacion | [docs/db/normalization.md](docs/db/normalization.md) |
 | Diagrama ER | [docs/db/er.diagram.png](docs/db/er.diagram.png) |
 | Diagrama relacional | [docs/db/relational.diagram.png](docs/db/relational.diagram.png) |
+| Analisis de queries SQL | [docs/db/analisis-sql.md](docs/db/analisis-sql.md) |
+| Diagrama relacional | [docs/db/resumen.md](docs/db/resumen.png) |
 
 ## Licencia
 
