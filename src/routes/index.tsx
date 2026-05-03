@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { createFileRoute, Link } from '@tanstack/react-router'
+import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { ChevronLeft, ChevronRight, Sparkles } from 'lucide-react'
 
 import { authClient } from '#/lib/auth-client'
@@ -36,9 +36,17 @@ type PromptResponse = {
 
 const pageSize = 8
 
-export const Route = createFileRoute('/')({ component: Home })
+export const Route = createFileRoute('/')({
+  validateSearch: (search: Record<string, unknown>) => ({
+    prompt: typeof search.prompt === 'string' ? search.prompt : undefined,
+  }),
+  component: Home,
+})
 
 function Home() {
+  const navigate = useNavigate({ from: Route.fullPath })
+  const { prompt: selectedPromptId } = Route.useSearch()
+
   const session = authClient.useSession()
   const user = session.data?.user ?? null
 
@@ -46,7 +54,6 @@ function Home() {
   const [response, setResponse] = useState<PromptResponse | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [selectedPrompt, setSelectedPrompt] = useState<Prompt | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -95,6 +102,26 @@ function Home() {
   }, [response?.pagination.total])
 
   const prompts = response?.data ?? []
+  const selectedPrompt = selectedPromptId
+    ? prompts.find((prompt) => prompt.id_prompt === selectedPromptId) ?? null
+    : null
+
+  const openPromptDetail = (prompt: Prompt) => {
+    void navigate({
+      search: (prev) => ({ ...prev, prompt: prompt.id_prompt }),
+      mask: {
+        to: '/prompts/$id',
+        params: { id: prompt.id_prompt },
+      },
+    })
+  }
+
+  const closePromptDetail = () => {
+    void navigate({
+      search: (prev) => ({ ...prev, prompt: undefined }),
+      replace: true,
+    })
+  }
 
   return (
     <div className="min-h-screen bg-[#0b1020] text-slate-100">
@@ -153,7 +180,7 @@ function Home() {
                     prompt={prompt}
                     currentUserId={user?.id ?? null}
                     availableAipoints={user ? 100 : null}
-                    onClick={() => setSelectedPrompt(prompt)}
+                    onClick={() => openPromptDetail(prompt)}
                   />
                 ))
               ) : (
@@ -208,10 +235,10 @@ function Home() {
       </main>
 
       <PromptDetailModal
-        open={Boolean(selectedPrompt)}
-        promptId={selectedPrompt?.id_prompt ?? null}
+        open={Boolean(selectedPromptId)}
+        promptId={selectedPromptId ?? null}
         fallbackPrompt={selectedPrompt}
-        onClose={() => setSelectedPrompt(null)}
+        onClose={closePromptDetail}
       />
     </div>
   )

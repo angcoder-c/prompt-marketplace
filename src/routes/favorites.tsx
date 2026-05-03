@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { createFileRoute, Link } from '@tanstack/react-router'
+import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 
 import { Sidebar } from '#/components/sidebar'
 import { PromptDetailModal } from '#/components/prompt-detail-modal'
@@ -46,13 +46,19 @@ type FollowedTagsResponse = {
 
 const pageSize = 8
 
-export const Route = createFileRoute('/favorites')({ component: FavoritesPage })
+export const Route = createFileRoute('/favorites')({
+	validateSearch: (search: Record<string, unknown>) => ({
+		prompt: typeof search.prompt === 'string' ? search.prompt : undefined,
+	}),
+	component: FavoritesPage,
+})
 
 function FavoritesPage() {
+	const navigate = useNavigate({ from: Route.fullPath })
+	const { prompt: selectedPromptId } = Route.useSearch()
 	const { profile } = useMarketplaceProfile()
 	const [response, setResponse] = useState<FavoritesResponse | null>(null)
 	const [followedTags, setFollowedTags] = useState<FollowedTag[]>([])
-    const [selectedPrompt, setSelectedPrompt] = useState<any | null>(null)
 	const [loading, setLoading] = useState(false)
 	const [error, setError] = useState<string | null>(null)
 
@@ -116,6 +122,26 @@ function FavoritesPage() {
 	}, [])
 
 	const prompts = response?.data ?? []
+	const selectedPrompt = selectedPromptId
+		? prompts.find((prompt) => prompt.id_prompt === selectedPromptId) ?? null
+		: null
+
+	const openPromptDetail = (prompt: Prompt) => {
+		void navigate({
+			search: (prev) => ({ ...prev, prompt: prompt.id_prompt }),
+			mask: {
+				to: '/prompts/$id',
+				params: { id: prompt.id_prompt },
+			},
+		})
+	}
+
+	const closePromptDetail = () => {
+		void navigate({
+			search: (prev) => ({ ...prev, prompt: undefined }),
+			replace: true,
+		})
+	}
 
 	return (
 		<main className="min-h-screen bg-[#0b1020] text-slate-100">
@@ -166,7 +192,7 @@ function FavoritesPage() {
 										prompt={prompt}
 										currentUserId={profile?.id_user ?? null}
 										availableAipoints={profile?.aipoints ?? null}
-										onClick={() => setSelectedPrompt(prompt)}
+									onClick={() => openPromptDetail(prompt)}
 									/>
 								))}
 
@@ -182,10 +208,10 @@ function FavoritesPage() {
 			</div>
 
 				<PromptDetailModal
-					open={Boolean(selectedPrompt)}
-					promptId={selectedPrompt?.id_prompt ?? null}
-					fallbackPrompt={selectedPrompt}
-					onClose={() => setSelectedPrompt(null)}
+				open={Boolean(selectedPromptId)}
+				promptId={selectedPromptId ?? null}
+				mode="modal"
+				onClose={closePromptDetail}
 				/>
 			</main>
 	)

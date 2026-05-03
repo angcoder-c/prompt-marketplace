@@ -6,19 +6,39 @@ import { PromptDetailModal } from '#/components/prompt-detail-modal'
 import { PromptFeedCard } from '#/components/promptfeedcard'
 import { useMarketplaceProfile } from '#/hooks/useMarketplaceProfile'
 
+type Prompt = {
+	id_prompt: string
+	user_id: string
+	title: string
+	description: string | null
+	content: string
+	model: string
+	aipoints_price: number
+	username: string
+	avatar_url: string | null
+	created_at: string
+	updated_at: string
+	upvotes: number
+	downvotes: number
+	tags: string[]
+}
+
 export const Route = createFileRoute('/tags/$slug')({
+  validateSearch: (search: Record<string, unknown>) => ({
+    prompt: typeof search.prompt === 'string' ? search.prompt : undefined,
+  }),
   component: TagPromptsPage,
 })
 
 function TagPromptsPage() {
   const { slug } = Route.useParams()
-  const navigate = useNavigate()
+  const navigate = useNavigate({ from: Route.fullPath })
+  const { prompt: selectedPromptId } = Route.useSearch()
   const { profile } = useMarketplaceProfile()
-  const [prompts, setPrompts] = useState<any[]>([])
+  const [prompts, setPrompts] = useState<Prompt[]>([])
   const [tagName, setTagName] = useState('')
   const [tagFollowersCount, setTagFollowersCount] = useState(0)
   const [isFollowing, setIsFollowing] = useState(false)
-  const [selectedPrompt, setSelectedPrompt] = useState<any | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [followLoading, setFollowLoading] = useState(false)
@@ -65,6 +85,27 @@ function TagPromptsPage() {
       cancelled = true
     }
   }, [slug])
+
+  const selectedPrompt = selectedPromptId
+    ? prompts.find((p) => p.id_prompt === selectedPromptId) ?? null
+    : null
+
+  const openPromptDetail = (prompt: Prompt) => {
+    void navigate({
+      search: (prev) => ({ ...prev, prompt: prompt.id_prompt }),
+      mask: {
+        to: '/prompts/$id',
+        params: { id: prompt.id_prompt },
+      },
+    })
+  }
+
+  const closePromptDetail = () => {
+    void navigate({
+      search: (prev) => ({ ...prev, prompt: undefined }),
+      replace: true,
+    })
+  }
 
   const toggleFollowTag = async () => {
     if (followLoading) {
@@ -147,13 +188,13 @@ function TagPromptsPage() {
 
             {!loading && !error && (
               <div className="grid gap-4 md:grid-cols-2">
-                {prompts.map((p) => (
+                {prompts.map((p: Prompt) => (
                   <PromptFeedCard
                     key={p.id_prompt}
                     prompt={p}
                     currentUserId={profile?.id_user ?? null}
                     availableAipoints={profile?.aipoints ?? null}
-                    onClick={() => setSelectedPrompt(p)}
+                    onClick={() => openPromptDetail(p)}
                   />
                 ))}
 
@@ -169,10 +210,10 @@ function TagPromptsPage() {
       </div>
 
       <PromptDetailModal
-        open={Boolean(selectedPrompt)}
-        promptId={selectedPrompt?.id_prompt ?? null}
+        open={Boolean(selectedPromptId)}
+        promptId={selectedPromptId ?? null}
         fallbackPrompt={selectedPrompt}
-        onClose={() => setSelectedPrompt(null)}
+        onClose={closePromptDetail}
       />
     </main>
   )

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { createFileRoute, Link } from '@tanstack/react-router'
+import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 
 import { PromptDetailModal } from '../components/prompt-detail-modal'
 import { Sidebar } from '../components/sidebar'
@@ -11,15 +11,21 @@ type MyPromptsResponse = {
 	purchased: any[]
 }
 
-export const Route = createFileRoute('/my-prompts')({ component: RouteComponent })
+export const Route = createFileRoute('/my-prompts')({
+	validateSearch: (search: Record<string, unknown>) => ({
+		prompt: typeof search.prompt === 'string' ? search.prompt : undefined,
+	}),
+	component: RouteComponent,
+})
 
 function RouteComponent() {
+	const navigate = useNavigate({ from: Route.fullPath })
+	const { prompt: selectedPromptId } = Route.useSearch()
 	const { profile } = useMarketplaceProfile()
 	const [created, setCreated] = useState<any[]>([])
 	const [purchased, setPurchased] = useState<any[]>([])
 	const [loading, setLoading] = useState(true)
 	const [error, setError] = useState<string | null>(null)
-	const [selectedPrompt, setSelectedPrompt] = useState<any | null>(null)
 
 	useEffect(() => {
 		let cancelled = false
@@ -58,6 +64,28 @@ function RouteComponent() {
 		}
 	}, [])
 
+	const allPrompts = [...created, ...purchased]
+	const selectedPrompt = selectedPromptId
+		? allPrompts.find((p) => p.id_prompt === selectedPromptId) ?? null
+		: null
+
+	const openPromptDetail = (prompt: any) => {
+		void navigate({
+			search: (prev) => ({ ...prev, prompt: prompt.id_prompt }),
+			mask: {
+				to: '/prompts/$id',
+				params: { id: prompt.id_prompt },
+			},
+		})
+	}
+
+	const closePromptDetail = () => {
+		void navigate({
+			search: (prev) => ({ ...prev, prompt: undefined }),
+			replace: true,
+		})
+	}
+
 	return (
 		<main className="min-h-screen bg-[#0b1020] text-slate-100">
 			<Sidebar active="my-prompts" />
@@ -88,7 +116,7 @@ function RouteComponent() {
 										prompt={p}
 										currentUserId={profile?.id_user ?? null}
 										availableAipoints={profile?.aipoints ?? null}
-										onClick={() => setSelectedPrompt(p)}
+										onClick={() => openPromptDetail(p)}
 									/>
 								))}
 								{!loading && created.length === 0 && (
@@ -108,7 +136,7 @@ function RouteComponent() {
 										prompt={p}
 										currentUserId={profile?.id_user ?? null}
 										availableAipoints={profile?.aipoints ?? null}
-										onClick={() => setSelectedPrompt(p)}
+										onClick={() => openPromptDetail(p)}
 									/>
 								))}
 								{!loading && purchased.length === 0 && (
@@ -123,10 +151,10 @@ function RouteComponent() {
 			</div>
 
 			<PromptDetailModal
-				open={Boolean(selectedPrompt)}
-				promptId={selectedPrompt?.id_prompt ?? null}
+				open={Boolean(selectedPromptId)}
+				promptId={selectedPromptId ?? null}
 				fallbackPrompt={selectedPrompt}
-				onClose={() => setSelectedPrompt(null)}
+				onClose={closePromptDetail}
 			/>
 		</main>
 	)
