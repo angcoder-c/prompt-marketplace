@@ -1,7 +1,7 @@
 import { useState } from 'react'
-import { createFileRoute, useNavigate } from '@tanstack/react-router'
+import { createFileRoute, useNavigate, Link } from '@tanstack/react-router'
 import { authClient } from '#/lib/auth-client'
-import { ChevronRight, Sparkles } from 'lucide-react'
+import { ArrowLeft, ChevronRight, Sparkles } from 'lucide-react'
 
 export const Route = createFileRoute('/auth')({ component: Auth })
 
@@ -52,6 +52,10 @@ function Auth() {
   return (
     <div className="min-h-screen bg-[#0b1020] text-slate-100">
       <div className="mx-auto flex max-w-5xl flex-col px-4 py-10">
+        <Link to="/" className="mb-6 inline-flex items-center gap-2 text-sm text-slate-300 transition hover:text-white">
+          <ArrowLeft className="h-4 w-4" />
+          Volver al inicio
+        </Link>
         <div className="mx-auto w-full max-w-md rounded-[28px] border border-white/10 bg-[#111a34] p-8 shadow-[0_24px_90px_-40px_rgba(0,0,0,0.85)]">
           <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-cyan-300/25 bg-cyan-300/10 text-cyan-200">
             <Sparkles className="h-6 w-6" />
